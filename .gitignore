@@ -216,3 +216,44 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# === Project-specific data exclusions ===
+
+# GWAS files
+data/gwas/*.tsv
+data/gwas/*.tsv.gz
+data/gwas/*.txt
+data/gwas/*.txt.gz
+data/gwas/*.vcf
+data/gwas/*.vcf.gz
+
+# scRNA-seq atlases
+data/atlases/*.h5ad
+data/atlases/*.rds
+data/atlases/*.mtx
+data/atlases/*.h5
+
+# Reference data
+data/reference/*.bed
+data/reference/*.bim
+data/reference/*.fam
+data/reference/*.owl
+
+# Generated results
+results/
+
+# But keep the .gitkeep placeholders so directory structure is preserved
+!data/gwas/.gitkeep
+!data/atlases/.gitkeep
+!data/reference/.gitkeep
+!results/.gitkeep
+
+# R-specific
+.Rhistory
+.RData
+.Ruserdata
+renv/library/
+
+# OS files
+.DS_Store
+Thumbs.db
