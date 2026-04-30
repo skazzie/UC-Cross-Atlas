@@ -239,14 +239,14 @@ data/reference/*.bim
 data/reference/*.fam
 data/reference/*.owl
 
-# Generated results
-results/
+# Generated results — ignore everything inside but keep the folder
+results/*
+!results/.gitkeep
 
-# But keep the .gitkeep placeholders so directory structure is preserved
+# Keep the .gitkeep placeholders for data subfolders
 !data/gwas/.gitkeep
 !data/atlases/.gitkeep
 !data/reference/.gitkeep
-!results/.gitkeep
 
 # R-specific
 .Rhistory
