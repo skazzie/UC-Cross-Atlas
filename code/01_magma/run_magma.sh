@@ -1,20 +1,41 @@
 #!/usr/bin/env bash
-# Run MAGMA annotation + gene-based test for the UC GWAS.
+# Run MAGMA annotation + gene-based test.
+#
+# Locked v1 (DECISIONS.md):
+#   - 10 kb upstream + 10 kb downstream window
+#   - 1000G EUR LD reference for both UC GWAS (acknowledged approximate
+#     for multi-ancestry Liu 2023; documented in Methods)
+#   - autosomes only — enforced upstream by prepare_gwas.py (which drops
+#     non-1-22 SNPs by default)
+#   - MHC region exclusion is applied LATER by make_scdrs_gs.py to the
+#     downstream gene set; MAGMA itself sees MHC SNPs to maintain the
+#     LD null model
+#
+# Run this once per GWAS:
+#   - de Lange 2017 UC (primary)
+#   - Liu 2023 multi-ancestry UC arm (cross-GWAS sensitivity)
+#   - Trubetskoy 2022 schizophrenia (negative control on Smillie)
 #
 # Usage:
 #   ./run_magma.sh <snp_loc> <pval_file> <gene_loc> <bfile_prefix> <window_kb> <out_prefix>
 #
-# Example (10 kb default):
-#   ./run_magma.sh data/gwas/uc.snp.loc data/gwas/uc.pval \
+# Example (de Lange UC):
+#   ./run_magma.sh data/gwas/uc_delange.snp.loc data/gwas/uc_delange.pval \
 #                  data/reference/NCBI37.3.gene.loc \
 #                  data/reference/g1000_eur \
-#                  10 results/magma/uc_10kb
+#                  10 results/magma/uc_delange_10kb
 #
-# Example (50 kb sensitivity, week 7.5):
-#   ./run_magma.sh data/gwas/uc.snp.loc data/gwas/uc.pval \
+# Example (Liu 2023 UC):
+#   ./run_magma.sh data/gwas/uc_liu.snp.loc data/gwas/uc_liu.pval \
 #                  data/reference/NCBI37.3.gene.loc \
 #                  data/reference/g1000_eur \
-#                  50 results/magma/uc_50kb
+#                  10 results/magma/uc_liu_10kb
+#
+# Example (Trubetskoy schizophrenia, negative control):
+#   ./run_magma.sh data/gwas/scz.snp.loc data/gwas/scz.pval \
+#                  data/reference/NCBI37.3.gene.loc \
+#                  data/reference/g1000_eur \
+#                  10 results/magma/scz_10kb
 
 set -euo pipefail
 
