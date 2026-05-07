@@ -1,15 +1,24 @@
 [project]
 name = "uc-cross-atlas"
 version = "0.1.0"
-description = "Cross-atlas reproducibility of GWAS-driven cell-type prioritization in ulcerative colitis"
+description = "Cross-atlas reproducibility of GWAS-driven cell-type prioritization in ulcerative colitis (v1)"
 requires-python = ">=3.10,<3.11"
-authors = [{ name = "Muskaan" }]
+authors = [
+    { name = "Author A" },
+    { name = "Author B" },
+]
 
+# Core deps used by code/01_magma and code/06_concordance.
+# Heavy single-cell deps (anndata, scanpy, scdrs) live under [atlas].
 dependencies = [
     "numpy>=1.24,<2.0",
     "pandas>=2.0",
     "scipy>=1.10",
     "scikit-learn>=1.3",
+    "statsmodels>=0.14",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "pyarrow>=14.0",  # feather IO for null-draw aggregations and specificity_long
 ]
 
 [project.optional-dependencies]
@@ -28,3 +37,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["code"]
+
+[tool.pytest.ini_options]
+# Concordance tests live next to the metrics library; run via:
+#   pytest code/06_concordance/test_metrics.py
+# This ensures `from metrics import ...` resolves to the right module
+# rather than to a stale top-level package.
+pythonpath = ["code/06_concordance"]
