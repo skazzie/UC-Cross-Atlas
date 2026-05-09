@@ -3,15 +3,14 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --partition=128x24
+#SBATCH --account=128x24
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=PUT_YOUR_EMAIL_HERE
-# ^^ Edit --partition / --mail-user, OR override at submit time:
-#    sbatch -p $UCC_PARTITION --mail-user=$UCC_EMAIL ...
+#SBATCH --mail-user=amoli@ucsc.edu
 #
 # Runs the full MAGMA pipeline for one GWAS:
 #   prepare_gwas -> annotate -> gene-test -> sanity_check -> .gs + gene-Z table

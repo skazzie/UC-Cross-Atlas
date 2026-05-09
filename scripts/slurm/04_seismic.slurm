@@ -3,13 +3,14 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --partition=128x24
+#SBATCH --account=128x24
 #SBATCH --time=02:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=24G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=PUT_YOUR_EMAIL_HERE
+#SBATCH --mail-user=amoli@ucsc.edu
 #
 # seismicGWAS regime-1 pipeline for one (atlas, GWAS) at both tiers.
 # Computes specificity (GWAS-independent, cached per atlas), runs

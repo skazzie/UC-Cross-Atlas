@@ -22,18 +22,20 @@ export UCC_LOGS="$UCC_SCRATCH/logs"
 
 # ---- SLURM parameters ----------------------------------------------------
 
-# General-purpose partition. Verify with `sinfo`. Common Hummingbird
-# names include "128x24", "Instruction", "240x44"; yours may differ.
+# General-purpose partition. Hummingbird verified via `sinfo`:
+#   128x24*    up infinite 18 nodes 122880 MB
+#   96x24gpu4  up infinite  1 node   94200 MB
+#   256x44     up infinite  1 node  252952 MB
 export UCC_PARTITION="${UCC_PARTITION:-128x24}"
 
 # High-memory partition for Pan-GI (~30 GB RAM, ~1.1M cells).
 export UCC_PARTITION_HIGHMEM="${UCC_PARTITION_HIGHMEM:-256x44}"
 
-# Account / project code if your cluster requires one. Leave blank to omit.
-export UCC_ACCOUNT="${UCC_ACCOUNT:-}"
+# SLURM account (verified via `sacctmgr show assoc user=$USER`).
+export UCC_ACCOUNT="${UCC_ACCOUNT:-128x24}"
 
 # Email for SLURM notifications.
-export UCC_EMAIL="${UCC_EMAIL:-$USER@ucsc.edu}"
+export UCC_EMAIL="${UCC_EMAIL:-amoli@ucsc.edu}"
 
 # Conda env name.
 export UCC_CONDA_ENV="${UCC_CONDA_ENV:-uc-cross-atlas}"

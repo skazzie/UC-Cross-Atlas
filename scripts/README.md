@@ -7,17 +7,17 @@ M1 + M3 pipeline. Per-template detail lives in `scripts/slurm/README.md`.
 
 ```bash
 # 1. SSH to Hummingbird, clone the repo
-ssh <username>@hummingbird.ucsc.edu
+ssh amoli@hummingbird.ucsc.edu
 git clone git@github.com:skazzie/UC-Cross-Atlas.git
 cd UC-Cross-Atlas/uc-cross-atlas
 
-# 2. Configure paths and SLURM defaults
-$EDITOR scripts/config.sh
-#  - UCC_PARTITION         your general partition (sinfo)
-#  - UCC_PARTITION_HIGHMEM your high-memory partition (for Pan-GI)
-#  - UCC_ACCOUNT           your project/account code if required
-#  - UCC_EMAIL             where SLURM should mail
-#  - UCC_SCRATCH           where atlases + results live
+# 2. config.sh ships with Hummingbird-verified defaults for amoli:
+#       UCC_PARTITION=128x24
+#       UCC_PARTITION_HIGHMEM=256x44
+#       UCC_ACCOUNT=128x24
+#       UCC_EMAIL=amoli@ucsc.edu
+#       UCC_SCRATCH=/hb/scratch/$USER/uc-cross-atlas
+#    Edit only if these change. Co-authors override via UCC_* env vars.
 
 # 3. Set up the conda env + R packages (~10-20 min, login node)
 bash scripts/setup_env.sh
@@ -49,30 +49,38 @@ sbatch --export=ALL,GWAS=scz     scripts/slurm/01_magma.slurm
 
 `config.sh` creates these directories on first source.
 
-## What's locked vs what you have to fill in
+## What's locked vs what you still have to fill in
 
-Locked in `config.sh` defaults (override by editing or by exporting env
-vars before submit):
+Locked in `config.sh` and the SLURM headers (verified against
+Hummingbird `sinfo` and `sacctmgr` for user `amoli` on 2026-05-09):
 
+- Partition: `128x24` (general) / `256x44` (high-memory, for Pan-GI)
+- Account: `128x24`
+- Email: `amoli@ucsc.edu`
 - Conda env name: `uc-cross-atlas`
 - Scratch path: `/hb/scratch/$USER/uc-cross-atlas`
 
-You must fill in (or override at submit time):
+Co-authors with different accounts can override at submit time without
+editing files:
 
-- `UCC_PARTITION` and `UCC_PARTITION_HIGHMEM` — get from `sinfo` /
-  Hummingbird docs.
-- `UCC_ACCOUNT` — only if your cluster's QOS requires it.
-- `UCC_EMAIL` — for SLURM notifications.
-- The `#SBATCH --partition=128x24` and `#SBATCH --mail-user=...` lines
-  in each `.slurm` file (one-time edit), OR override at submit:
+```bash
+sbatch -p $UCC_PARTITION --account=$UCC_ACCOUNT --mail-user=$UCC_EMAIL \
+       --export=ALL,GWAS=delange \
+       scripts/slurm/01_magma.slurm
+```
 
-  ```bash
-  sbatch -p $UCC_PARTITION --mail-user=$UCC_EMAIL ... script.slurm
-  ```
+**Still need to fill in at M1:**
 
-You also have to fill in the Liu 2023 sample size (`N_FIXED`) and the
-Trubetskoy SCZ sample size in `scripts/slurm/01_magma.slurm` — verify
-both at M1 from the source papers.
+- Liu 2023 sample size (`N_FIXED`) in `scripts/slurm/01_magma.slurm` —
+  use the paper's combined N, OR add `--col-n <colname>` to the
+  prepare_gwas.py call if the file has per-SNP N (preferred per
+  DECISIONS.md).
+- Trubetskoy 2022 SCZ sample size in `scripts/slurm/01_magma.slurm` —
+  defaults to 130,635 but verify against the paper.
+- Mennillo donor count after pre-treatment subsetting — used in
+  `--array=0-N` for `donor_loo_array.slurm`. Verify ≥8 per DECISIONS.md.
+- Cell Ontology release date — record in DECISIONS.md M2 section after
+  `download_refs.sh` pulls `cl.owl`.
 
 ## Smoke testing before submitting batch jobs
 

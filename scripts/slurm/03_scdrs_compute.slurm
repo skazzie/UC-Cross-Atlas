@@ -3,15 +3,17 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --partition=128x24
+#SBATCH --account=128x24
 #SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=PUT_YOUR_EMAIL_HERE
-# ^^ For Pan-GI (~1.1M cells) override --mem and --partition at submit:
-#    sbatch -p $UCC_PARTITION_HIGHMEM --mem=48G --time=06:00:00 \
+#SBATCH --mail-user=amoli@ucsc.edu
+#
+# For Pan-GI (~1.1M cells) override --mem and --partition at submit:
+#    sbatch -p 256x44 --mem=48G --time=06:00:00 \
 #           --export=ALL,ATLAS=pangi,GWAS=delange,TIER_LIST=broad \
 #           scripts/slurm/03_scdrs_compute.slurm
 #

@@ -3,13 +3,14 @@
 #SBATCH --output=%x_%A_%a.out
 #SBATCH --error=%x_%A_%a.err
 #SBATCH --partition=128x24
+#SBATCH --account=128x24
 #SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=PUT_YOUR_EMAIL_HERE
+#SBATCH --mail-user=amoli@ucsc.edu
 #SBATCH --array=1-3
 # ^^ 3 seeds (1, 2, 3). Test-retest gates per DECISIONS.md:
 #    scDRS pass >= 0.9; seismicGWAS pass >= 0.999.

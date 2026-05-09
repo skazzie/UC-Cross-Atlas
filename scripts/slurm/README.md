@@ -4,21 +4,21 @@ One template per pipeline step. All scripts source `../config.sh`, so
 edit that file (or export `UCC_*` env vars before submit) to set the
 partition, account, and email.
 
-## First, edit the headers
+## SBATCH defaults
 
-Each `.slurm` file has these placeholders that won't auto-fill from
-config.sh because SBATCH directives are parsed before the script body
-runs:
+All templates ship with the Hummingbird-verified defaults:
 
 ```
-#SBATCH --partition=128x24             # change to your partition
-#SBATCH --mail-user=PUT_YOUR_EMAIL_HERE
+#SBATCH --partition=128x24
+#SBATCH --account=128x24
+#SBATCH --mail-user=amoli@ucsc.edu
 ```
 
-Either edit them in-place once, or override at submit time:
+To override at submit time (e.g., if a co-author runs the same scripts
+under a different account):
 
 ```bash
-sbatch -p $UCC_PARTITION --mail-user=$UCC_EMAIL \
+sbatch -p $UCC_PARTITION --account=$UCC_ACCOUNT --mail-user=$UCC_EMAIL \
        --export=ALL,GWAS=delange \
        scripts/slurm/01_magma.slurm
 ```
