@@ -1,0 +1,49 @@
+name: uc-cross-atlas
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  # ---- core Python (pinned to scDRS-supported version) ----
+  - python=3.10
+  - pip
+
+  # ---- numerics + plotting ----
+  - numpy>=1.24,<2.0
+  - pandas>=2.0
+  - scipy>=1.10
+  - scikit-learn>=1.3
+  - statsmodels>=0.14
+  - matplotlib>=3.8
+  - seaborn>=0.13
+  - pyarrow>=14.0          # feather IO for null-draw aggregations + specificity_long
+
+  # ---- single-cell ----
+  - anndata>=0.10
+  - scanpy>=1.10
+
+  # ---- genomics tooling ----
+  - plink=1.9              # 1000G EUR LD reference manipulation; MAGMA wants bfile
+  - bcftools
+  - htslib
+
+  # ---- R-side (seismicGWAS + Brown's method) ----
+  # Conda's r-base ships R 4.3.x; if Hummingbird has a module-loaded R
+  # you prefer, drop r-base from this file and `module load r/4.3.x`.
+  - r-base>=4.3
+  - r-essentials
+  - r-devtools
+  - r-remotes
+  - r-tidyverse
+  - r-ggsci
+  - bioconductor-singlecellexperiment
+  - bioconductor-zellkonverter
+  - bioconductor-complexheatmap
+  - bioconductor-empiricalbrownsmethod
+  - r-ontologyindex
+
+  # ---- dev ----
+  - pytest>=8.0
+
+  # ---- pip-only ----
+  - pip:
+      - scdrs==1.0.4
