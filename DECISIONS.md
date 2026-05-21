@@ -327,3 +327,228 @@ they are dropped and v1 stands alone.
 ---
 
 ## [Append future entries here, dated, with rationale]
+
+## CORRECTION 2026-05-20 (1/7): de Lange UC GWAS accession
+
+Original entry: "UC primary = de Lange 2017, GCST004131."
+
+Verified incorrect via GWAS Catalog browser check + cross-reference to
+medRxiv 2025.03.03.25323217, which lists the de Lange 2017 trio as:
+  GCST004131 = IBD-combined
+  GCST004132 = Crohn's disease
+  GCST004133 = ulcerative colitis
+
+Corrected v1 primary UC GWAS accession: GCST004133.
+
+All downstream filenames (uc_delange.*) and artifacts retain the
+"uc_delange" prefix; only the accession changes.
+
+---
+
+## CORRECTION 2026-05-20 (2/7): Atlas 2 citation
+
+Original entry: "Atlas 2 = Kong et al. 2023, Immunity 56:444-458,
+GEO GSE214695 (UC subset of CD atlas)."
+
+Verified incorrect via CELLxGENE dataset page for GSE214695, which is
+owned by:
+  Garrido-Trigo et al. 2023, Nat Commun 14:4506,
+  "Macrophage and neutrophil heterogeneity at single-cell spatial
+   resolution in human inflammatory bowel disease."
+  doi: 10.1038/s41467-023-40156-6
+  Cohort: 6 HC + 6 CD + 6 UC active, 46,700 cells, colonic mucosa.
+  UC subset for our analysis: 6 HC + 6 UC active = 12 donors,
+  30,068 cells.
+
+Kong et al. 2023 Immunity is a separate Crohn's Disease atlas (ileum + colon)
+with no clean UC subset and is NOT appropriate as v1 Atlas 2. It may be
+reconsidered for v2 CD work.
+
+Corrected v1 Atlas 2: Garrido-Trigo et al. 2023, GSE214695 (UC subset).
+Donor counts (6 HC + 6 UC) and GEO accession (GSE214695) were already
+correct; only the citation/attribution changes.
+
+Internal slug change: rename "kong" -> "garrido_trigo" across the repo
+(see Part 6 for the exact rename list).
+
+---
+
+## CORRECTION 2026-05-20 (3/7): Pan-GI slice + overlap policy
+
+Original plan committed to Pan-GI as broad atlas comparator framed as
+"integration-pipeline-robustness comparator with known donor overlap
+(Smillie only)" and HCA Gut as broad atlas comparator framed as
+"independent of our trio."
+
+CELLxGENE inspection revealed:
+1. Pan-GI Extended+ slice (1,596,200 cells) is the only slice with all
+   lineages (epithelial + immune + stromal + endothelial + neural).
+   Other slices (e.g. "Extended - Large Intestine") are lineage-restricted
+   (epithelial only at 96,675 cells) and CANNOT support cross-lineage
+   cell-type prioritization. Use Extended+ as the canonical Pan-GI v1 input.
+2. Pan-GI Extended+ study column contains "Elmentaite2021" = 398,460 cells
+   (~25% of the atlas). Elmentaite 2021 IS the HCA Gut Atlas. Therefore
+   HCA Gut is NOT independent of Pan-GI; it is nested within it.
+3. Pan-GI Extended+ study column also contains "Kong2023" = 235,327 cells.
+   Not relevant for UC v1 (Kong is CD-only) but noted for future CD work.
+4. Pan-GI Extended+ study column does NOT contain Smillie2019. The plan's
+   "known Smillie overlap with Pan-GI" claim is unverified; treat as
+   "no Smillie overlap" until proven otherwise. The Pan-GI loader should
+   still scan for Smillie donor IDs and produce a "0 cells overlapped"
+   sensitivity report rather than asserting Smillie absence.
+
+Locked Option A policy (keep both atlases, plan for nested overlap):
+  - Pan-GI v1 = Extended+ - 18485 genes slice
+    Download URL: https://datasets.cellxgene.cziscience.com/1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8.h5ad
+  - HCA Gut v1 = "Total - Cells of the human intestinal tract mapped
+    across space and time"
+    Download URL: https://datasets.cellxgene.cziscience.com/f34d2b82-9265-4a73-bda4-852933bf2a8d.h5ad
+  - HCA Gut framing is corrected to "external single-atlas reference;
+    nested within Pan-GI." Not independent.
+  - Pan-GI runs are paired with TWO sensitivities:
+      (a) Without Elmentaite2021 (test: does HCA Gut overlap drive results?)
+      (b) Without any Smillie donor IDs found (likely no-op; documents
+          the empirical overlap rather than assumed)
+  - Pan-GI v1 filter chain (applied in load_pangi.py):
+      * disease in {normal, ulcerative colitis, IBD}
+      * organ_unified in {ascending colon, caecum, colon, descending colon,
+                          rectum, sigmoid colon, transverse colon}
+      * sample_type != "Organ_donor_resection" (different biology;
+        keep biopsy + resection only)
+      * Expected post-filter: ~150-200k cells (tractable on 128x24)
+
+---
+
+## CORRECTION 2026-05-20 (4/7): Garrido-Trigo annotation tier availability
+
+CELLxGENE deposit of Garrido-Trigo
+(b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad) contains only the 5 CL-mapped
+lineage labels in obs['cell_type']:
+  - colon epithelial cell
+  - myeloid cell
+  - plasma cell
+  - stromal cell of lamina propria of colon
+  - T cell of anorectum
+
+The paper's full 51-tier and 91-tier annotations (as visible in the Salas
+lab Shiny app at servidor2-ciberehd.upc.es/external/garrido/app/) are NOT
+in the CELLxGENE deposit. The lab's GitHub repo
+(linked from CELLxGENE under "Protocol") contains analysis code for the
+spatial CosMx data only; no per-cell scRNA-seq annotations.
+
+Marker gene table per cluster IS available (downloaded from the Shiny app)
+and stored at:
+  data/atlases/garrido_trigo_markers.xlsx
+Structure: 5 sheets (one per compartment) with columns
+(p_val, avg_log2FC, pct.1, pct.2, p_val_adj, cluster, Population, gene).
+91 unique fine clusters across all compartments.
+
+Locked decision: Garrido-Trigo contributes broad-tier only (5 lineages)
+to v1 cross-atlas concordance. Fine-tier concordance restricted to
+4 atlases: Smillie x Pan-GI x HCA Gut x Mennillo.
+
+Note: broad-tier from Garrido-Trigo (5 categories) is below the v1
+target of 10-15 for the "broad" tier. Document as known limitation in
+the manuscript. Recovery path for v2: email corresponding author
+Azucena Salas requesting the .rds with full annotations.
+
+---
+
+## CORRECTION 2026-05-20 (5/7): scDRS raw-count flag across CELLxGENE atlases
+
+CELLxGENE-deposited atlases (Garrido-Trigo confirmed; Pan-GI and HCA Gut
+expected to follow same pattern; verify on download) ship with
+log-normalized X only; no raw.X, no integer-count layer.
+
+Confirmed for Garrido-Trigo via direct .h5ad inspection:
+  AnnData has no .raw, no .layers, X is float32 log-normalized.
+
+Implication for scDRS protocol:
+  scripts/slurm/03_scdrs_compute.slurm currently uses --flag-raw-count True.
+  This is incompatible with normalized-count input.
+
+Two options considered:
+  (a) Re-process every atlas from GEO raw count matrices (canonical inputs
+      but adds significant scope and compute).
+  (b) Use --flag-raw-count False uniformly across all v1 atlases.
+
+Locked: Option (b) for v1. Update scripts/slurm/03_scdrs_compute.slurm
+to use --flag-raw-count False. Methodological note: scDRS supports both
+modes; the original paper validates both. Treat this as a limitation to
+disclose in methods, not a flaw to fix.
+
+For Mennillo (GEO-sourced, will have raw counts), re-normalize using the
+same pipeline as CELLxGENE atlases (log1p of CP10k) before scDRS to keep
+input distributions comparable across all atlases.
+
+---
+
+## CORRECTION 2026-05-20 (6/7): HCA Gut filter chain and covariates
+
+HCA Gut (Elmentaite 2021) CELLxGENE deposit
+(f34d2b82-9265-4a73-bda4-852933bf2a8d.h5ad):
+  - 428,469 cells across 15 tissues
+  - obs['category'] = 9 broad lineages (Epithelial, Mesenchymal, Myeloid,
+    T cells, Plasma cells, B cells, Endothelial, Neuronal, RBC).
+    USE AS BROAD TIER.
+  - obs['author_cell_type'] = ~120 fine cell types. USE AS FINE TIER
+    AFTER ROLL-UP (see Part 5: cl_rollup.py).
+  - obs['cell_type'] (CL ontology, ~75 terms) is IGNORED for analysis;
+    serves only as the harmonization anchor in cl_rollup.py.
+  - obs['Age_group'] spans fetal (First trim, Second trim), pediatric
+    (Pediatric, Pediatric_IBD), and adult (Adult, Adult_MLN).
+  - obs['Fraction'] has 5 sorting strategies (SC, SC-45N, SC-45P,
+    SC-EPCAMN, SC-EPCAMP). Cell-type proportions in HCA Gut are
+    artificially controlled by sort strategy and are NOT biologically
+    interpretable.
+  - obs['batch'] has ~100 batch IDs.
+  - disease values: Crohn disease (27,164) + normal (401,305). No UC.
+
+Locked v1 filter chain (load_hca_gut.py):
+  * Age_group in {Adult, Adult_MLN} (excludes fetal/pediatric/IBD-pediatric)
+  * tissue in {ascending colon, caecum, colon, descending colon,
+               large intestine, rectum, sigmoid colon, transverse colon}
+  * Expected post-filter: 30k-70k cells.
+
+Locked scDRS covariates for HCA Gut: assay, batch, Fraction, sex.
+Fraction is critical because sort strategy correlates strongly with cell
+type identity; omitting it would conflate sort-induced expression
+differences with biology.
+
+Locked sensitivity: paired run excluding Crohn disease cells (analogous
+to Pan-GI's Elmentaite2021-removal sensitivity). Tests whether residual
+Crohn signal in this "broad reference" atlas affects UC cell-type
+prioritization.
+
+Note: HCA Gut is a healthy reference; it does NOT need UC samples for
+its role in cell-type prioritization. The GWAS provides the UC association
+signal; the atlas provides the cell-type catalog.
+
+---
+
+## CORRECTION 2026-05-20 (7/7): Smillie atlas source - CELLxGENE unusable
+
+Smillie 2019 (Cell 175:372-386, "Intra- and Inter-cellular Rewiring of
+the Human Colon during Ulcerative Colitis") has a CELLxGENE deposit
+(e373cf41-e123-4c98-a8bb-a531c7bbedd2.h5ad), but inspection shows:
+  - 34,772 cells (~9% of the paper's full 366,650-cell atlas)
+  - 12 donors all prefixed "N" (Normal/Healthy)
+  - All from "Epi" compartment (epithelial only; no immune, no stromal)
+  - No disease column; Source column confirms healthy-epithelial subset
+
+This deposit is UNUSABLE for the project because:
+  - It contains zero UC samples (defeats the purpose of an "UC core" atlas)
+  - It lacks immune and stromal compartments (cannot support cross-lineage
+    prioritization)
+  - It overlaps with HCA Gut's role as a healthy reference
+
+Locked: Smillie v1 source = Single Cell Portal SCP259 (canonical deposit
+with 366,650 cells, 30 donors, 18 UC + 12 HC, all compartments).
+
+This requires (deferred to next session, not this batch):
+  - Single Cell Portal account creation + email verification
+  - Browser-mediated consent/access click on SCP259
+  - ~5-8 GB download to Hummingbird scratch
+
+After SCP259 is on disk, run a separate schema-capture session for
+Smillie (and Mennillo, also deferred to GEO download).
