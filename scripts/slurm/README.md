@@ -31,7 +31,7 @@ sbatch -p $UCC_PARTITION --account=$UCC_ACCOUNT --mail-user=$UCC_EMAIL \
 | `03_scdrs_compute.slurm` | scDRS regime-1 for one (atlas, GWAS) | `ATLAS=...`, `GWAS=...`, optional `GS_SUFFIX=_with_mhc`, `SEED=42` | ~30–45 min, 24 GB. Pan-GI: bump `--mem=48G`, `--time=06:00:00`, use highmem partition. |
 | `04_seismic.slurm` | seismicGWAS regime-1 for one (atlas, GWAS) | `ATLAS=...`, `GWAS=...`, optional `PERMUTE=1` | ~30 min base; +30 min per (atlas,GWAS,tier) when `PERMUTE=1`. |
 | `test_retest_array.slurm` | Test-retest seeds 1,2,3 for one (atlas, method) under de Lange | `ATLAS=...`, `METHOD=scdrs\|seismic`; `--array=1-3` baked in | 9 scDRS jobs + 9 seismic jobs total across the trio. |
-| `donor_loo_array.slurm` | Donor-LOO jackknife for one (atlas, method) under de Lange | `ATLAS=...`, `METHOD=...`; set `--array=0-N` to match donor count | Kong has a built-in ≥5-cases-per-group guard. |
+| `donor_loo_array.slurm` | Donor-LOO jackknife for one (atlas, method) under de Lange | `ATLAS=...`, `METHOD=...`; set `--array=0-N` to match donor count | `garrido_trigo` has a built-in ≥5-cases-per-group guard. |
 
 ## M1 → M3 submission order
 
@@ -47,7 +47,7 @@ sbatch --export=ALL,GWAS=liu     scripts/slurm/01_magma.slurm
 sbatch --export=ALL,GWAS=scz     scripts/slurm/01_magma.slurm
 
 # 2. M3 regime-1 scDRS — 6 baseline runs (3 atlases x 2 GWAS)
-for atlas in smillie kong mennillo; do
+for atlas in smillie garrido_trigo mennillo; do
   for gwas in delange liu; do
     sbatch --export=ALL,ATLAS=$atlas,GWAS=$gwas \
            scripts/slurm/03_scdrs_compute.slurm
@@ -55,7 +55,7 @@ for atlas in smillie kong mennillo; do
 done
 
 # 3. M3 regime-1 seismicGWAS — 6 baseline runs
-for atlas in smillie kong mennillo; do
+for atlas in smillie garrido_trigo mennillo; do
   for gwas in delange liu; do
     sbatch --export=ALL,ATLAS=$atlas,GWAS=$gwas \
            scripts/slurm/04_seismic.slurm
@@ -70,7 +70,7 @@ sbatch --export=ALL,ATLAS=smillie,GWAS=delange,GS_SUFFIX=_with_mhc \
 # per-step submission once data is in place.
 
 # 5. M3 test-retest — 3 atlases x 2 methods (de Lange only)
-for atlas in smillie kong mennillo; do
+for atlas in smillie garrido_trigo mennillo; do
   for method in scdrs seismic; do
     sbatch --export=ALL,ATLAS=$atlas,METHOD=$method \
            scripts/slurm/test_retest_array.slurm
@@ -80,7 +80,7 @@ done
 # 6. M4 donor-LOO — broad tier, de Lange, both methods
 sbatch --array=0-29 --export=ALL,ATLAS=smillie,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm
-sbatch --array=0-11 --export=ALL,ATLAS=kong,METHOD=scdrs \
+sbatch --array=0-11 --export=ALL,ATLAS=garrido_trigo,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm
 sbatch --array=0-N  --export=ALL,ATLAS=mennillo,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm

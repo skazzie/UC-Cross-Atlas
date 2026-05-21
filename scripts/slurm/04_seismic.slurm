@@ -22,7 +22,7 @@
 #
 # Submit examples:
 #   sbatch --export=ALL,ATLAS=smillie,GWAS=delange scripts/slurm/04_seismic.slurm
-#   sbatch --export=ALL,ATLAS=kong,GWAS=delange,PERMUTE=1 scripts/slurm/04_seismic.slurm
+#   sbatch --export=ALL,ATLAS=garrido_trigo,GWAS=delange,PERMUTE=1 scripts/slurm/04_seismic.slurm
 
 set -euo pipefail
 
@@ -38,7 +38,7 @@ conda activate "$UCC_CONDA_ENV"
 
 cd "$UCC_REPO"
 
-: "${ATLAS:?set ATLAS=smillie|kong|mennillo|hca_gut|pangi}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi}"
 : "${GWAS:?set GWAS=delange|liu}"
 PERMUTE="${PERMUTE:-0}"
 

@@ -12,16 +12,16 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=amoli@ucsc.edu
 # ^^ Set the array bounds at submit time to match donor count:
-#    Smillie ~30, Kong 12, Mennillo ~10-15. Per DECISIONS.md:
+#    Smillie ~30, garrido_trigo 12, Mennillo ~10-15. Per DECISIONS.md:
 #       --array=0-29      for Smillie
-#       --array=0-11      for Kong  (BUT see Kong special handling below)
+#       --array=0-11      for garrido_trigo  (small-cohort guard applies; see below)
 #       --array=0-N       for Mennillo (verify N at M1 after subsetting)
 #
 # Locked scope (DECISIONS.md):
 #   - broad-tier headline metrics under de Lange only
 #   - both methods (scDRS + seismicGWAS)
 #   - Liu = point estimates only (no LOO)
-#   - Kong: enforce >=5 cases per group (6 UC + 6 healthy total);
+#   - garrido_trigo: enforce >=5 cases per group (6 UC + 6 healthy total);
 #     LOO iterations that drop below this are skipped.
 #
 # Submit examples:
@@ -30,7 +30,7 @@
 #       scripts/slurm/donor_loo_array.slurm
 #
 #   sbatch --array=0-11 \
-#       --export=ALL,ATLAS=kong,METHOD=seismic \
+#       --export=ALL,ATLAS=garrido_trigo,METHOD=seismic \
 #       scripts/slurm/donor_loo_array.slurm
 
 set -euo pipefail
@@ -47,7 +47,7 @@ conda activate "$UCC_CONDA_ENV"
 
 cd "$UCC_REPO"
 
-: "${ATLAS:?set ATLAS=smillie|kong|mennillo}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo}"
 : "${METHOD:?set METHOD=scdrs|seismic}"
 GWAS=delange
 TIER=broad
@@ -69,8 +69,8 @@ fi
 
 echo "[donor_loo] atlas=$ATLAS method=$METHOD dropping_donor=$DROPPED_DONOR"
 
-# Kong-specific guard: skip iterations that violate >=5 cases per group.
-if [ "$ATLAS" = "kong" ]; then
+# garrido_trigo-specific guard: skip iterations that violate >=5 cases per group.
+if [ "$ATLAS" = "garrido_trigo" ]; then
     GROUP=$(awk -F, -v d="$DROPPED_DONOR" 'NR > 1 && $1 == d { print $4 }' "$DONOR_META")
     if [ -z "$GROUP" ]; then
         echo "[donor_loo] no disease_status for $DROPPED_DONOR; skipping" >&2
@@ -79,7 +79,7 @@ if [ "$ATLAS" = "kong" ]; then
     REMAINING_IN_GROUP=$(awk -F, -v g="$GROUP" -v d="$DROPPED_DONOR" \
         'NR > 1 && $4 == g && $1 != d { c++ } END { print c+0 }' "$DONOR_META")
     if [ "$REMAINING_IN_GROUP" -lt 5 ]; then
-        echo "[donor_loo] Kong: dropping $DROPPED_DONOR would leave $REMAINING_IN_GROUP" \
+        echo "[donor_loo] garrido_trigo: dropping $DROPPED_DONOR would leave $REMAINING_IN_GROUP" \
              "in group=$GROUP; skipping per DECISIONS.md."
         exit 0
     fi

@@ -238,6 +238,8 @@ data/reference/*.bed
 data/reference/*.bim
 data/reference/*.fam
 data/reference/*.owl
+data/reference/*.tsv
+data/reference/*.tsv.gz
 
 # Generated results — ignore everything inside but keep the folder
 results/*

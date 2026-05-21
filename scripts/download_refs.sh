@@ -120,10 +120,11 @@ cat <<EOF
      Download to: \$UCC_DATA/atlases/smillie.h5ad
      (Free Single Cell Portal account required.)
 
-  2. Kong 2023 UC subset (GSE214695) —
-     https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE214695
-     Download supplementary files; convert to:
-       \$UCC_DATA/atlases/kong.h5ad
+  2. Garrido-Trigo 2023 UC subset (GSE214695 / CELLxGENE) —
+     https://datasets.cellxgene.cziscience.com/b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad
+     UC subset filter applied by code/02_atlas_prep/load_garrido_trigo.py.
+     Save to:
+       \$UCC_DATA/atlases/garrido_trigo.h5ad
 
   3. Mennillo 2024 — verify GEO accession at M1; subset to
      pre-treatment baseline samples per DECISIONS.md before saving:

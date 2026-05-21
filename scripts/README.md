@@ -24,7 +24,7 @@ bash scripts/setup_env.sh
 
 # 4. Auto-fetch what's freely downloadable; manually fetch the rest
 bash scripts/download_refs.sh
-#  Manual: Smillie / Kong / Mennillo / HCA Gut / Pan-GI / Liu / SCZ
+#  Manual: Smillie / Garrido-Trigo / Mennillo / HCA Gut / Pan-GI / Liu / SCZ
 #  See the printed instructions and the M1 spot-checks in PLAN.md.
 
 # 5. M1 MAGMA pipeline (3 GWAS x ~30 min each)

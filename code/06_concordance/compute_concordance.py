@@ -30,7 +30,7 @@ Usage:
     python compute_concordance.py \\
         --input \\
             results/scdrs/smillie_delange_broad/UC.cell_type.tsv:smillie:scdrs:delange:broad \\
-            results/scdrs/kong_delange_broad/UC.cell_type.tsv:kong:scdrs:delange:broad \\
+            results/scdrs/garrido_trigo_delange_broad/UC.cell_type.tsv:garrido_trigo:scdrs:delange:broad \\
             results/scdrs/mennillo_delange_broad/UC.cell_type.tsv:mennillo:scdrs:delange:broad \\
             ... \\
         --out results/concordance/cross_atlas_table.csv
