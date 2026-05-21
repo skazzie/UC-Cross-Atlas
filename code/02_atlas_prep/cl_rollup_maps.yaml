@@ -1,0 +1,21 @@
+# Per-atlas override maps for cell_type_fine -> cell_type_fine_rolled.
+#
+# Heuristics in cl_rollup.py handle parentheticals, numeric/letter
+# subcluster suffixes, and hi/lo/+/- markers. Use this file only for
+# labels those heuristics miss.
+#
+# Format:
+#   <atlas_slug>:
+#     "Original Label": "Rolled Label"
+#
+# Populate as we encounter edge cases. Empty sections are valid.
+
+garrido_trigo: {}
+
+pangi: {}
+
+hca_gut: {}
+
+smillie: {}
+
+mennillo: {}
