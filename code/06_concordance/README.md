@@ -64,10 +64,10 @@ adapt with a one-liner pandas rename or via the `--score-col`,
 python code/06_concordance/compute_concordance.py \
     --input \
         results/scdrs/smillie_delange_broad/UC.cell_type.tsv:smillie:scdrs:delange:broad \
-        results/scdrs/kong_delange_broad/UC.cell_type.tsv:kong:scdrs:delange:broad \
+        results/scdrs/garrido_trigo_delange_broad/UC.cell_type.tsv:garrido_trigo:scdrs:delange:broad \
         results/scdrs/mennillo_delange_broad/UC.cell_type.tsv:mennillo:scdrs:delange:broad \
         results/scdrs/smillie_delange_fine/UC.cell_type.tsv:smillie:scdrs:delange:fine \
-        results/scdrs/kong_delange_fine/UC.cell_type.tsv:kong:scdrs:delange:fine \
+        results/scdrs/garrido_trigo_delange_fine/UC.cell_type.tsv:garrido_trigo:scdrs:delange:fine \
         results/scdrs/mennillo_delange_fine/UC.cell_type.tsv:mennillo:scdrs:delange:fine \
         results/scdrs/smillie_liu_broad/UC.cell_type.tsv:smillie:scdrs:liu:broad \
         ... \

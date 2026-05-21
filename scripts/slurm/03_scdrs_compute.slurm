@@ -25,9 +25,9 @@
 #   - n_ctrl = 1000 Monte Carlo null draws
 #
 # Submit examples:
-#   sbatch --export=ALL,ATLAS=smillie,GWAS=delange  scripts/slurm/03_scdrs_compute.slurm
-#   sbatch --export=ALL,ATLAS=kong,GWAS=delange     scripts/slurm/03_scdrs_compute.slurm
-#   sbatch --export=ALL,ATLAS=mennillo,GWAS=delange scripts/slurm/03_scdrs_compute.slurm
+#   sbatch --export=ALL,ATLAS=smillie,GWAS=delange       scripts/slurm/03_scdrs_compute.slurm
+#   sbatch --export=ALL,ATLAS=garrido_trigo,GWAS=delange scripts/slurm/03_scdrs_compute.slurm
+#   sbatch --export=ALL,ATLAS=mennillo,GWAS=delange      scripts/slurm/03_scdrs_compute.slurm
 #   sbatch --export=ALL,ATLAS=smillie,GWAS=liu      scripts/slurm/03_scdrs_compute.slurm
 #   ...
 #
@@ -52,7 +52,7 @@ cd "$UCC_REPO"
 
 # ---- Required parameters -------------------------------------------------
 
-: "${ATLAS:?set ATLAS=smillie|kong|mennillo|hca_gut|pangi}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi}"
 : "${GWAS:?set GWAS=delange|liu|scz}"
 
 GS_SUFFIX="${GS_SUFFIX:-}"
@@ -77,12 +77,16 @@ echo "[03_scdrs] atlas=$ATLAS  gwas=$GWAS  seed=$SEED  out=$OUT"
 
 # ---- 1. compute-score (the heavy step) -----------------------------------
 
+# NOTE (DECISIONS.md correction 2026-05-20 (5/7)): CELLxGENE atlases ship
+# log-normalized X with no raw layer. v1 policy locks --flag-raw-count False
+# uniformly across all atlases. Mennillo (GEO raw counts) is re-normalized
+# via log1p(CP10k) in load_mennillo.py to keep input distributions comparable.
 scdrs compute-score \
     --h5ad-file "$H5AD" \
     --gs-file "$GS" \
     --cov-file "$COV" \
     --flag-filter-data True \
-    --flag-raw-count True \
+    --flag-raw-count False \
     --n-ctrl 1000 \
     --random-seed "$SEED" \
     --out-folder "$OUT/"

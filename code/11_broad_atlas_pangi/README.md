@@ -35,3 +35,47 @@ integration." Methods text states this explicitly.
 - `results/broad_atlas/pangi_concordance_excluded.tsv` — donor-overlap excluded (headline).
 - `results/broad_atlas/pangi_donor_audit.tsv` — cross-atlas donor audit
   across all 5 atlases.
+
+## v1 sensitivities (DECISIONS.md 2026-05-20 (3/7))
+
+Pan-GI Extended+ contains Elmentaite2021 (= HCA Gut, ~398k cells) and
+Kong2023 (CD-only, ~235k cells); HCA Gut is therefore *nested* within
+Pan-GI rather than independent. Smillie2019 was not found in the
+`study` column but is scanned for empirically rather than assumed absent.
+
+Two paired sensitivity runs are required for the Pan-GI x UC GWAS
+analyses:
+
+1. **HCA Gut overlap test** — re-run with Elmentaite2021 cells removed.
+   Loader: `code/02_atlas_prep/load_pangi.load_pangi_no_elmentaite()`.
+   Compares the resulting cell-type prioritization against the headline
+   Pan-GI run to assess whether shared donors with HCA Gut drive the
+   signal.
+
+2. **Smillie overlap empirical scan** — re-run with any cells whose
+   `donorID_unified` matches the Smillie 2019 donor-ID pattern
+   (`^(N|UC)\d+$`) removed. Expected to be a no-op (0 cells matched in
+   inspection); the loader still produces a report so the empirical
+   overlap is documented rather than asserted.
+   Loader: `code/02_atlas_prep/load_pangi.load_pangi_no_smillie()`.
+
+## v1 filter chain
+
+Defined in `load_pangi.py`:
+
+```
+disease in {normal, ulcerative colitis, inflammatory bowel disease}
+organ_unified in {ascending colon, caecum, colon, descending colon,
+                  rectum, sigmoid colon, transverse colon}
+sample_type != "Organ_donor_resection"
+```
+
+Expected post-filter: ~150-200k cells (tractable on the 128x24 partition
+with `--mem=48G --time=06:00:00`).
+
+## Slice choice
+
+Pan-GI v1 = **Extended+ - 18485 genes** slice (1,596,200 cells), the
+only Pan-GI slice with all lineages (epithelial + immune + stromal +
+endothelial + neural). Other slices (e.g. "Extended - Large Intestine")
+are lineage-restricted and cannot support cross-lineage prioritization.

@@ -9,15 +9,19 @@ analysis.
 
 - **Smillie 2019** (Single Cell Portal SCP259) — 366,650 colon mucosa
   cells, 18 UC + 12 healthy.
-- **Kong 2023 UC subset** (GEO GSE214695) — 6 healthy + 6 active UC.
+- **Garrido-Trigo 2023 UC subset** (GEO GSE214695 / CELLxGENE) — 6 healthy
+  + 6 active UC. (Previously listed as "Kong 2023" — see DECISIONS.md
+  correction 2026-05-20 (2/7).)
 - **Mennillo 2024** (GEO accession to confirm in M1) — anti-integrin
   therapy time course; **subset to pre-treatment baseline samples only**.
   Verify ≥8 donors after subsetting; if fewer, swap to Garrido-Trigo 2023.
 - **HCA Gut Cell Atlas** (cellxgene, Elmentaite 2021) — large-intestine
   subset only. M1 must verify zero donor overlap with the UC trio.
-- **Pan-GI** (cellxgene, Oliver 2024) — large-intestine subset only.
-  Substantial donor overlap with UC trio (integrated Smillie 2019,
-  anchored Kong 2023).
+- **Pan-GI** (cellxgene, Oliver 2024) — Extended+ slice (1.6M cells),
+  the only slice with all lineages. Filtered to large-intestine cells
+  by `load_pangi.py`. Contains Elmentaite2021 (= HCA Gut, 398,460 cells)
+  and the Kong 2023 CD atlas (235,327 cells); no Smillie2019. See
+  DECISIONS.md correction 2026-05-20 (3/7) for the overlap policy.
 
 ## HGNC pin
 
@@ -65,3 +69,46 @@ comparator to stretch — scDRS requires raw counts.
 - `data/atlases/<atlas>_covariates.tsv` — scDRS covariate file.
 - `data/atlases/donor_metadata/<atlas>_donor_metadata.csv` — donor attribution.
 - `data/atlases/<atlas>_sce.rds` — SingleCellExperiment for seismicGWAS.
+
+## v1 loader scripts (session 2026-05-20)
+
+Canonical schema reference: `atlas_schemas.md` (commit with this batch).
+DECISIONS.md corrections 2026-05-20 (1/7) through (7/7) document the v1
+locked policy.
+
+| Script | Atlas | Status | Filter chain |
+|--------|-------|--------|--------------|
+| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | Production | `disease in {normal, ulcerative colitis}` |
+| `load_pangi.py` | Pan-GI Extended+ (broad comparator) | Production | UC + IBD diseases x colon organs x non-organ-donor |
+| `load_hca_gut.py` | HCA Gut / Elmentaite 2021 (broad reference) | Production | `Age_group in {Adult, Adult_MLN}` x colon tissues |
+| `load_smillie.py` | Smillie 2019 (UC core) | Skeleton | SCP259 download deferred to next session |
+| `load_mennillo.py` | Mennillo 2024 (UC core) | Skeleton | GEO download deferred to next session |
+
+Each production loader exposes a `load(h5ad_path, apply_v1_filter=True,
+raw_count_mode=False)` function returning a standardized AnnData with
+obs columns: `cell_type_broad`, `cell_type_fine`, `donor`, `sex`,
+`tissue`, `disease`, `assay`, `batch` (plus atlas-specific extras).
+
+Paired sensitivity loaders:
+
+- `load_pangi.load_pangi_no_elmentaite()` — drops Elmentaite2021 cells
+  (HCA Gut overlap test).
+- `load_pangi.load_pangi_no_smillie()` — drops any cells matching the
+  Smillie donor-ID pattern (expected no-op based on inspection).
+- `load_hca_gut.load_hca_gut_no_crohn()` — drops Crohn-disease cells.
+
+## Shared utilities
+
+| Script | Purpose |
+|--------|---------|
+| `hgnc_remap.py` | Convert Ensembl `var_names` to HGNC symbols via `var['feature_name']`; drop duplicates / non-canonical entries. Called as the last step of every loader. |
+| `cl_rollup.py` + `cl_rollup_maps.yaml` | Collapse high-cardinality fine annotations (e.g. HCA Gut's ~120 `author_cell_type`) down to ~30-50 categories. Adds `cell_type_fine_rolled` to obs; preserves the original column. Override mappings per atlas in the YAML. |
+| `../03_scdrs/aggregate_null_draws.py` | Aggregate scDRS per-cell null-draw z-scores to per-cell-type tensors (input to Brown's-method empirical correlation matrix in M5). Invoked by the SLURM wrapper. |
+
+## Data references
+
+- `data/atlases/garrido_trigo_markers.xlsx` — Salas-lab marker gene table
+  (91 fine clusters across 5 compartments), used by sanity_check.py to
+  validate MAGMA top-gene patterns. The CELLxGENE deposit only ships
+  the 5 CL-mapped broad lineages; this xlsx is the only available
+  fine-tier reference. See DECISIONS.md correction (4/7).
