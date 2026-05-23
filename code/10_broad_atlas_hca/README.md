@@ -67,3 +67,24 @@ Cell-type proportions in HCA Gut are artificially controlled by the
 `Fraction` column (sort strategy) and are NOT biologically interpretable.
 scDRS per-cell scoring is unaffected, but DO NOT report cell-type
 abundance from HCA Gut in figures.
+
+## Driver script
+
+`code/10_broad_atlas_hca/run_hca_comparison.py`. CLI:
+
+```bash
+python code/10_broad_atlas_hca/run_hca_comparison.py \
+    --hca-results-base results/hca_gut \
+    --hca-no-crohn-base results/hca_gut_no_crohn \
+    --uc-atlases smillie garrido_trigo mennillo \
+    --gwas delange liu \
+    --methods scdrs seismic \
+    --tiers broad fine \
+    --scdrs-dir results/scdrs \
+    --seismic-dir results/seismic \
+    --out-headline results/broad_atlas/hca_gut_concordance.tsv \
+    --out-no-crohn results/broad_atlas/hca_gut_concordance_no_crohn.tsv
+```
+
+Loads pre-existing scDRS/seismicGWAS results — does NOT run the methods
+itself. Runs on login node.

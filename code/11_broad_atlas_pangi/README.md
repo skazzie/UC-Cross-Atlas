@@ -79,3 +79,29 @@ Pan-GI v1 = **Extended+ - 18485 genes** slice (1,596,200 cells), the
 only Pan-GI slice with all lineages (epithelial + immune + stromal +
 endothelial + neural). Other slices (e.g. "Extended - Large Intestine")
 are lineage-restricted and cannot support cross-lineage prioritization.
+
+## Driver script
+
+`code/11_broad_atlas_pangi/run_pangi_comparison.py`. Full + two sensitivities
++ donor audit. CLI:
+
+```bash
+python code/11_broad_atlas_pangi/run_pangi_comparison.py \
+    --pangi-results-base results/pangi \
+    --pangi-no-elmentaite-results-base results/pangi_no_elmentaite \
+    --pangi-no-smillie-results-base results/pangi_no_smillie \
+    --uc-atlases smillie garrido_trigo mennillo \
+    --gwas delange liu \
+    --methods scdrs seismic \
+    --tiers broad fine \
+    --scdrs-dir results/scdrs \
+    --seismic-dir results/seismic \
+    --out-full results/broad_atlas/pangi_concordance_full.tsv \
+    --out-no-elmentaite results/broad_atlas/pangi_concordance_no_elmentaite.tsv \
+    --out-no-smillie results/broad_atlas/pangi_concordance_no_smillie.tsv \
+    --out-donor-audit results/broad_atlas/pangi_donor_audit.tsv \
+    --pangi-h5ad data/atlases/pangi.h5ad
+```
+
+Donor audit reads h5ad files with `backed='r'`. Atlases not on disk are
+skipped with a warning rather than failing. Runs on login node.
