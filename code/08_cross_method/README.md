@@ -36,3 +36,19 @@ columns `atlas`, `gwas`, `tier`, `spearman_rho`, `ci_lo`, `ci_hi`,
 `jaccard_top5`, `jaccard_top10` (+ `jaccard_top20` at fine tier), `kappa`,
 `kappa_threshold` (0.05 or 0.01 contingency), `n_sig_scdrs`,
 `n_sig_seismic`, `n_common`.
+
+## Driver script
+
+`code/08_cross_method/run_cross_method.py`. CLI:
+
+```bash
+python code/08_cross_method/run_cross_method.py \
+    --atlases smillie garrido_trigo mennillo \
+    --gwas delange liu \
+    --tiers broad fine \
+    --scdrs-dir results/scdrs \
+    --seismic-dir results/seismic \
+    --out results/cross_method/cross_method_concordance.tsv
+```
+
+Runs on login node (lightweight aggregation; no SLURM wrapper needed).

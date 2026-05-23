@@ -43,3 +43,24 @@ off-diagonals), activate stretch #1: permutation-based covariance with
 `results/regime2/<method>_<tier>_delange.tsv` with columns:
 `cell_type`, `combined_pval`, `n_atlases_combined`, `correlation_fallback`
 (boolean for the median-substitution edge case).
+
+## Driver script
+
+`code/07_regime2_meta/run_brown.py`. One (method, tier, gwas) per invocation.
+Implements the Kost-McDermott analytical form of Brown's method inline
+using Brown's (1975) polynomial covariance approximation — no R or extra
+PyPI dependency. Matches the math in R's `EmpiricalBrownsMethod::kostsMethod()`.
+
+CLI:
+
+```bash
+python code/07_regime2_meta/run_brown.py \
+    --method scdrs \
+    --tier broad \
+    --gwas delange \
+    --regime1-dir results/scdrs \
+    --null-draws-dir results/null_draws \
+    --out results/regime2/scdrs_broad_delange.tsv
+```
+
+Runs on the login node.

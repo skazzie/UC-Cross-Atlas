@@ -33,3 +33,19 @@ Uses the shared library in `code/06_concordance/metrics.py`.
 `atlas`, `method`, `tier`, `spearman_rho`, `ci_lo`, `ci_hi`,
 `jaccard_top5`, `jaccard_top10` (+ `jaccard_top20` at fine tier), `kappa`,
 `kappa_threshold`, `n_sig_delange`, `n_sig_liu`, `n_common`.
+
+## Driver script
+
+`code/09_cross_gwas/run_cross_gwas.py`. CLI:
+
+```bash
+python code/09_cross_gwas/run_cross_gwas.py \
+    --atlases smillie garrido_trigo mennillo \
+    --methods scdrs seismic \
+    --tiers broad fine \
+    --scdrs-dir results/scdrs \
+    --seismic-dir results/seismic \
+    --out results/cross_gwas/cross_gwas_concordance.tsv
+```
+
+Runs on login node.
