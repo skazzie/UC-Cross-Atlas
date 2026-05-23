@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=ucc_seismic
-#SBATCH --output=%x_%j.out
-#SBATCH --error=%x_%j.err
+#SBATCH --output=%x_%A_%a.out
+#SBATCH --error=%x_%A_%a.err
 #SBATCH --partition=128x24
 #SBATCH --account=128x24
 #SBATCH --time=02:00:00
@@ -12,17 +12,21 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=amoli@ucsc.edu
 #
-# seismicGWAS regime-1 pipeline for one (atlas, GWAS) at both tiers.
-# Computes specificity (GWAS-independent, cached per atlas), runs
-# get_ct_trait_associations() for the requested GWAS, and saves the
-# specificity scores in long format for v2 reuse.
+# seismicGWAS regime-1 pipeline — one (atlas, GWAS, tier) per task.
 #
-# For Brown's method support, also runs M=1000 gene-Z permutations
-# (~30 min per (atlas, GWAS, tier)) when PERMUTE=1.
+# Default array covers all 12 UC-trio jobs:
+#   ATLAS in {smillie, garrido_trigo, mennillo}
+#   GWAS  in {delange, liu}
+#   TIER  in {broad, fine}
 #
-# Submit examples:
-#   sbatch --export=ALL,ATLAS=smillie,GWAS=delange scripts/slurm/04_seismic.slurm
-#   sbatch --export=ALL,ATLAS=garrido_trigo,GWAS=delange,PERMUTE=1 scripts/slurm/04_seismic.slurm
+# Submit the full sweep:
+#   sbatch --array=0-11 scripts/slurm/04_seismic.slurm
+#
+# Or a single job (broad atlas comparator, no array):
+#   sbatch --export=ALL,ATLAS=hca_gut,GWAS=delange,TIER=broad scripts/slurm/04_seismic.slurm
+#
+# Permutations are on by default (M=1000 per task, ~30 min). Disable with
+#   PERMUTE=0 for a quick smoke check.
 
 set -euo pipefail
 
@@ -38,55 +42,60 @@ conda activate "$UCC_CONDA_ENV"
 
 cd "$UCC_REPO"
 
-: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi}"
+# ---- Resolve (ATLAS, GWAS, TIER) from array index OR env -----------------
+
+ATLASES=(smillie smillie smillie smillie garrido_trigo garrido_trigo garrido_trigo garrido_trigo mennillo mennillo mennillo mennillo)
+GWASES=(delange  delange  liu      liu      delange       delange       liu           liu           delange  delange  liu      liu)
+TIERS=(broad     fine     broad    fine     broad         fine          broad         fine          broad    fine     broad    fine)
+
+if [ -n "${SLURM_ARRAY_TASK_ID:-}" ] && [ -z "${ATLAS:-}" ]; then
+    IDX="$SLURM_ARRAY_TASK_ID"
+    ATLAS="${ATLASES[$IDX]}"
+    GWAS="${GWASES[$IDX]}"
+    TIER="${TIERS[$IDX]}"
+fi
+
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi (or submit with --array=0-11)}"
 : "${GWAS:?set GWAS=delange|liu}"
-PERMUTE="${PERMUTE:-0}"
+: "${TIER:=broad}"
+PERMUTE="${PERMUTE:-1}"
+SEED="${SEED:-42}"
 
-SCE="$UCC_DATA/atlases/${ATLAS}_sce.rds"
+H5AD="$UCC_DATA/atlases/${ATLAS}.h5ad"
 GENE_Z="$UCC_DATA/gwas/${GWAS}_gene_z.tsv"
-OUT="$UCC_RESULTS/seismic/${ATLAS}_${GWAS}"
-SPEC_LONG="$UCC_REPO/code/04_seismic/specificity_long/${ATLAS}_specificity.feather"
+OUT="$UCC_RESULTS/seismic"
 
-mkdir -p "$OUT" "$(dirname "$SPEC_LONG")"
+mkdir -p "$OUT" "$OUT/permutations"
 
-for f in "$SCE" "$GENE_Z"; do
+for f in "$H5AD" "$GENE_Z"; do
     if [ ! -f "$f" ]; then
         echo "ERROR: missing input $f" >&2
         exit 1
     fi
 done
 
-echo "[04_seismic] atlas=$ATLAS  gwas=$GWAS  permute=$PERMUTE"
+echo "[04_seismic] atlas=$ATLAS gwas=$GWAS tier=$TIER permute=$PERMUTE"
 
-# Driver script TBD in M3 — once written, this block invokes it.
 DRIVER="code/04_seismic/run_seismic.R"
 if [ ! -f "$DRIVER" ]; then
-    cat <<EOF
-[04_seismic] note: $DRIVER does not exist yet.
-This SLURM template assumes a small R driver of the form:
+    echo "ERROR: $DRIVER missing" >&2
+    exit 1
+fi
 
-    Rscript code/04_seismic/run_seismic.R \\
-        --sce $SCE \\
-        --gene-z $GENE_Z \\
-        --tiers broad,fine \\
-        --out-dir $OUT \\
-        --specificity-long $SPEC_LONG \\
-        --permute $PERMUTE \\
-        --m-permutations 1000
-
-Write that driver during M3 (see code/04_seismic/README.md). For now
-this job exits successfully but does no work.
-EOF
-    exit 0
+PERM_ARG=()
+if [ "$PERMUTE" != "1" ]; then
+    PERM_ARG=(--skip-permutations)
 fi
 
 Rscript "$DRIVER" \
-    --sce "$SCE" \
-    --gene-z "$GENE_Z" \
-    --tiers broad,fine \
+    --atlas "$ATLAS" \
+    --gwas "$GWAS" \
+    --tier "$TIER" \
+    --h5ad-path "$H5AD" \
+    --magma-z "$GENE_Z" \
     --out-dir "$OUT" \
-    --specificity-long "$SPEC_LONG" \
-    --permute "$PERMUTE" \
-    --m-permutations 1000
+    --permutations 1000 \
+    --seed "$SEED" \
+    "${PERM_ARG[@]}"
 
-echo "[04_seismic] DONE"
+echo "[04_seismic] DONE ($ATLAS $GWAS $TIER)"

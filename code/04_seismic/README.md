@@ -77,3 +77,24 @@ matrix; deviation indicates a bug).
 - `code/04_seismic/specificity_long/<atlas>_specificity.feather` — long-format specificity.
 - `results/seismic/permutations/<atlas>_<gwas>_<tier>_permnulls.feather` —
   per-permutation null draws for Brown's.
+
+## Driver script
+
+`code/04_seismic/run_seismic.R`. One (atlas, GWAS, tier) per invocation.
+CLI:
+
+```bash
+Rscript code/04_seismic/run_seismic.R \
+    --atlas garrido_trigo \
+    --gwas delange \
+    --tier broad \
+    --h5ad-path data/atlases/garrido_trigo.h5ad \
+    --magma-z results/magma/delange_gene_z.tsv \
+    --out-dir results/seismic \
+    --permutations 1000 \
+    --seed 42
+```
+
+Runs on Hummingbird via `scripts/slurm/04_seismic.slurm`. Default sbatch
+array covers the 12 (atlas, GWAS, tier) UC-trio jobs:
+`sbatch --array=0-11 scripts/slurm/04_seismic.slurm`.
