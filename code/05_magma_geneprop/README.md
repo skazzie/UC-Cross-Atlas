@@ -36,3 +36,20 @@ upstream pipeline has a bug.
 
 `results/magma_geneprop/smillie_broad_delange.tsv` — one row per broad
 cell type with regression coefficient, p-value, BH-FDR.
+
+## Driver script
+
+`code/05_magma_geneprop/run_magma_geneprop.py`. Smillie / broad / de Lange.
+CLI:
+
+```bash
+python code/05_magma_geneprop/run_magma_geneprop.py \
+    --atlas smillie \
+    --h5ad-path data/atlases/smillie.h5ad \
+    --magma-z results/magma/delange_gene_z.tsv \
+    --tier broad \
+    --gwas delange \
+    --out results/magma_geneprop/smillie_broad_delange.tsv
+```
+
+Runs on the login node (single-pass OLS; no SLURM wrapper needed).
