@@ -40,6 +40,8 @@ dependencies:
   - bioconductor-complexheatmap
   - bioconductor-empiricalbrownsmethod
   - r-ontologyindex
+  - r-arrow
+  - r-biocmanager
 
   # ---- dev ----
   - pytest>=8.0
