@@ -38,7 +38,7 @@ _fetch() {
 
 if [ ! -f reference/g1000_eur.bed ]; then
     _fetch \
-        "https://ctg.cncr.nl/software/MAGMA/ref_data/g1000_eur.zip" \
+        "https://vu.data.surf.nl/s/VZNByNwpD8qqINe/download" \
         reference/g1000_eur.zip
     if [ -f reference/g1000_eur.zip ]; then
         unzip -o reference/g1000_eur.zip -d reference/
