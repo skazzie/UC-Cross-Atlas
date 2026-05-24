@@ -51,7 +51,7 @@ fi
 if [ ! -x reference/magma ]; then
     # Version may need updating; check https://ctg.cncr.nl/software/magma
     _fetch \
-        "https://ctg.cncr.nl/software/MAGMA/prog/magma_v1.10.zip" \
+        "https://vu.data.surf.nl/s/lxDgt2dNdNr6DYt/download" \
         reference/magma.zip
     if [ -f reference/magma.zip ]; then
         mkdir -p reference/_magma_unpacked
@@ -66,7 +66,7 @@ fi
 
 if [ ! -f reference/NCBI37.3.gene.loc ]; then
     _fetch \
-        "https://ctg.cncr.nl/software/MAGMA/aux_files/NCBI37.3.zip" \
+        "https://vu.data.surf.nl/s/Pj2orwuF2JYyKxq/download" \
         reference/ncbi37_aux.zip
     if [ -f reference/ncbi37_aux.zip ]; then
         unzip -o -j reference/ncbi37_aux.zip -d reference/
