@@ -20,8 +20,10 @@ atlases (Smillie 2019, Kong 2023, Mennillo 2024) against two UC GWAS
 (de Lange 2017, Liu 2023 multi-ancestry), using two methods (scDRS,
 seismicGWAS) at two cell-type granularity tiers (broad ~10–15 cell types;
 fine ~30–50 cell states). We also compare to two broad multi-tissue gut
-atlases — HCA Gut Cell Atlas (independent of our trio) and Pan-GI
-(integration-pipeline-robustness comparator with known donor overlap).
+atlases — HCA Gut Cell Atlas (external single-atlas reference; nested
+within Pan-GI as ~25% of Extended+, per DECISIONS.md correction 3/7) and
+Pan-GI (integration-pipeline-robustness comparator with known donor
+overlap).
 
 The full plan is in [`docs/uc-cross-atlas-v1-plan.pdf`](docs/uc-cross-atlas-v1-plan.pdf);
 [`PLAN.md`](PLAN.md) is a tight operational summary.

@@ -78,7 +78,7 @@ locked policy.
 
 | Script | Atlas | Status | Filter chain |
 |--------|-------|--------|--------------|
-| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | Production | `disease in {normal, ulcerative colitis}` |
+| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | Production | `disease in {normal, ulcerative colitis}`; joins GEO `GSE214695_cell_annotation.csv` for full 82-fine + 15-broad tier (correction reversing 4/7) |
 | `load_pangi.py` | Pan-GI Extended+ (broad comparator) | Production | UC + IBD diseases x colon organs x non-organ-donor |
 | `load_hca_gut.py` | HCA Gut / Elmentaite 2021 (broad reference) | Production | `Age_group in {Adult, Adult_MLN}` x colon tissues |
 | `load_smillie.py` | Smillie 2019 (UC core) | Skeleton | SCP259 download deferred to next session |
@@ -109,6 +109,9 @@ Paired sensitivity loaders:
 
 - `data/atlases/garrido_trigo_markers.xlsx` — Salas-lab marker gene table
   (91 fine clusters across 5 compartments), used by sanity_check.py to
-  validate MAGMA top-gene patterns. The CELLxGENE deposit only ships
-  the 5 CL-mapped broad lineages; this xlsx is the only available
-  fine-tier reference. See DECISIONS.md correction (4/7).
+  validate MAGMA top-gene patterns and used to verify Ribhi = ribosomal-high
+  state (RPL*/RPS* dominate top-20 markers in every Ribhi cluster).
+- `GSE214695_cell_annotation.csv` (GEO supplementary, downloaded to
+  Hummingbird scratch alongside the matrix) — the per-cell 91-cluster
+  fine annotation. Joined onto the CELLxGENE matrix by barcode in
+  `load_garrido_trigo.py`. See DECISIONS.md correction reversing (4/7).

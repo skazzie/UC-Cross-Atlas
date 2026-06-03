@@ -552,3 +552,77 @@ This requires (deferred to next session, not this batch):
 
 After SCP259 is on disk, run a separate schema-capture session for
 Smillie (and Mennillo, also deferred to GEO download).
+
+---
+
+## CORRECTION 2026-06-03 (8): Garrido-Trigo annotation tier — reversing (4/7)
+
+Correction (4/7) locked Garrido-Trigo as broad-tier-only (5 CL lineages)
+on the premise that the paper's full 51- and 91-tier annotations were
+not in any downloadable form. That premise was wrong.
+
+GEO GSE214695 ships a supplementary file
+`GSE214695_cell_annotation.csv` containing the full 91-cluster Salas-lab
+fine annotation, joinable to the CELLxGENE matrix by barcode. The 5-CL
+CELLxGENE labels are still present but are now used only as a coherence
+cross-check; the GEO CSV is the source of truth for both tiers.
+
+Locked decision: Garrido-Trigo contributes **broad + fine tier** to v1
+cross-atlas concordance. The fine-tier UC trio is back to 3 atlases
+(Smillie x Garrido-Trigo x Mennillo). Correction (4/7)'s broad-only
+restriction is voided.
+
+Loader changes (`code/02_atlas_prep/load_garrido_trigo.py`):
+
+- New required argument `annotation_csv_path` for the GEO CSV; if
+  omitted, the loader falls back to the (4/7) degraded mode with a
+  warning.
+- Barcode join auto-detects column names from a candidate set and tries
+  five join strategies (raw, strip/add `-1` suffix, composite
+  `donor_id + barcode` either side). Raises a diagnostic error with
+  example barcodes if no strategy hits all cells (no orphans tolerated).
+- Every label is whitespace- and unicode-normalized on load
+  (`_normalize_label`). One known case in the CSV is
+  `'PC  immediate early response'` with a literal double space; that
+  alone would silently break string joins downstream.
+- 9 Ribhi clusters are collapsed into parent lineages
+  (`RIBHI_TO_PARENT`) before any tier logic. Empirically verified:
+  RPL*/RPS* genes dominate the top-20 markers of every Ribhi cluster in
+  `garrido_trigo_markers.xlsx` — Ribhi is a ribosomal-high cross-lineage
+  transcriptional state, not a lineage or a batch artifact. Ribhi cells
+  are never entered as standalone fine clusters in cross-atlas
+  concordance.
+- `cell_type_fine` (82 surviving labels) and `cell_type_broad`
+  (15-level roll-up) populated from a hand-curated `FINE_TO_BROAD` map
+  covering all 82 surviving fine labels + the 4 generic Ribhi parents
+  (epithelial, T, fibroblast, mast) + 2 defensive synonyms (long-form
+  PC IER, "Cycling cells 3" mentioned in the to-do but absent from
+  the marker xlsx).
+- Logs UC-subset cell and donor counts and warns if they deviate from
+  the (2/7) expected 30,068 cells / 12 donors.
+
+Followups carried into M2 harmonization (notes, not blockers):
+
+- 14 of 91 fall below the ≥50-cell rule in HC+UC and drop as standalone
+  fine clusters: Cycling cells 3, Cycling myeloid, DCs CCL22,
+  DCs CCL22_Ribhi, DN EOMES, Enteroendocrine, Eosinophils, FRCs,
+  Lymphatic endothelium, M1 CXCL5, MAIT, Neutrophil 2, Neutrophil 3,
+  Paneth-like. They roll up into broad parents, so broad-tier
+  concordance is unaffected; only fine-tier is trimmed.
+- Cross-atlas fine-tier intersection is expected to be modest;
+  hyper-specific states (PC IgA heat shock 1/2, M1 ACOD1, etc.) will not
+  map to Smillie/Mennillo. Methods text must avoid framing this as
+  "91-way fine concordance."
+- `nanostring_reference` (54 levels, clean nested coarsening of the 91)
+  remains useful scaffolding but is NOT used as the broad tier (too
+  fine, non-uniform depth).
+- No email to Azucena Salas required; the GEO CSV is the full annotation
+  the (4/7) recovery path anticipated. Email is now a backstop only if
+  the barcode join turns out broken.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_garrido_trigo.py`
+- `code/02_atlas_prep/atlas_schemas.md`
+- `README.md` (HCA Gut wording — see Section D of the to-do)
+- `DECISIONS.md` (this entry)

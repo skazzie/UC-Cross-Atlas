@@ -10,9 +10,13 @@ Schema captured 2026-05-20.
 
 ## garrido_trigo
 
-- **Source**: CELLxGENE
-- **Download URL**: https://datasets.cellxgene.cziscience.com/b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad
-- **File size**: 176 MB
+- **Matrix source**: CELLxGENE
+- **Matrix download URL**: https://datasets.cellxgene.cziscience.com/b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad
+- **Matrix file size**: 176 MB
+- **Annotation source**: GEO GSE214695 supplementary file
+  `GSE214695_cell_annotation.csv` (Salas-lab 91-cluster fine labels;
+  NOT present in the CELLxGENE deposit — see DECISIONS.md correction
+  reversing (4/7))
 - **n_cells**: 46,700 (full deposit) / 30,068 (UC subset HC + UC)
 - **n_donors**: 18 (full) / 12 (UC subset: HC_1-6 + UC_1-6)
 - **Assay**: 10x 3' v3
@@ -25,11 +29,57 @@ adata = adata[adata.obs["disease"].isin(["normal", "ulcerative colitis"])]
 
 ### Tiers
 
-- **broad_tier_column**: `cell_type` (5 CL lineages: T cell of anorectum,
-  plasma cell, colon epithelial cell, stromal cell of lamina propria of
-  colon, myeloid cell)
-- **fine_tier_column**: NONE in CELLxGENE deposit. Documented limitation.
-  Garrido-Trigo contributes broad-tier only to cross-atlas concordance.
+Both tiers are populated by joining the GEO annotation CSV onto the
+CELLxGENE matrix by barcode (auto-detected join key; loader raises a
+diagnostic error if any cell is orphaned).
+
+- **fine_tier**: 82 surviving labels (91 published - 9 Ribhi collapsed
+  into parent lineage). Stored in `obs['cell_type_fine']`. Hyper-specific
+  states (PC IgA heat shock 1/2, M1 ACOD1, etc.) won't map cleanly to
+  Smillie/Mennillo; the cross-atlas fine intersection is expected to be
+  modest — do not oversell "91-way fine concordance."
+- **broad_tier**: 15-level roll-up of the surviving fine labels via
+  `FINE_TO_BROAD` in `load_garrido_trigo.py`. Stored in
+  `obs['cell_type_broad']`. Levels: colonocyte, goblet,
+  epithelial progenitor, enteroendocrine/tuft, fibroblast, endothelium,
+  mural/glia, T cell, NK/ILC, B cell, plasma cell, monocyte/macrophage,
+  dendritic cell, mast cell, granulocyte.
+- **CELLxGENE `obs['cell_type']` (5 CL lineages)** is NOT used for tier
+  output; the loader uses the GEO annotation as the source of truth.
+  Useful only as a coherence cross-check.
+
+### Ribhi collapse policy
+
+The 9 `*Ribhi` clusters are a ribosomal-high cross-lineage transcriptional
+state (verified empirically: RPL*/RPS* dominate top-20 markers in
+`garrido_trigo_markers.xlsx`). Collapsed in the loader before any tier
+logic, via `RIBHI_TO_PARENT`:
+
+| Ribhi label         | Parent fine label |
+|---------------------|-------------------|
+| B cell Ribhi        | B cell            |
+| Epithelium Ribhi    | epithelial        |
+| M0_Ribhi            | M0                |
+| Ribhi T cells 1/2   | T                 |
+| S1 Ribhi            | S1                |
+| Fibroblasts Ribhi   | fibroblast        |
+| Mast Ribhi          | mast              |
+| DCs CCL22_Ribhi     | DCs CCL22         |
+
+Ribhi cells are never entered as standalone fine clusters in cross-atlas
+concordance.
+
+### Label normalization on load
+
+Every label from the GEO CSV is passed through `_normalize_label`:
+
+- Collapse internal whitespace (the CSV contains
+  `'PC  immediate early response'` with a literal double space).
+- Normalize `ï`/`é` → `i`/`e` so map keys can stay ASCII.
+- Strip leading/trailing whitespace.
+
+This prevents silent join breakage when label strings vary between
+the marker xlsx and the annotation CSV.
 
 ### Covariates for scDRS
 
@@ -38,15 +88,20 @@ adata = adata[adata.obs["disease"].isin(["normal", "ulcerative colitis"])]
 
 ### Counts
 
-- `X`: log-normalized float32
+- `X`: log-normalized float32 (CELLxGENE)
 - `raw`: NOT PRESENT (use `--flag-raw-count False`)
 - `var_names`: Ensembl IDs (HGNC symbols in `var['feature_name']`)
+- **Do NOT switch `--flag-raw-count True` for Garrido-Trigo** even though
+  the GEO RAW.tar matrices have true integer counts; uniform
+  `--flag-raw-count False` across atlases preserves cross-atlas input
+  comparability (DECISIONS.md correction 5/7).
 
 ### Markers reference
 
 Marker gene table at `data/atlases/garrido_trigo_markers.xlsx` (5 sheets,
 91 fine clusters total). Used by `sanity_check.py` to validate MAGMA
-top-gene patterns against known inflammatory subsets.
+top-gene patterns against known inflammatory subsets, AND by us in the
+session that wrote correction (8) to verify Ribhi = ribosomal-high state.
 
 ---
 
