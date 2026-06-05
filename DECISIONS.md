@@ -733,3 +733,138 @@ Files updated in this batch:
 - `code/02_atlas_prep/atlas_schemas.md` (correction-9 banner on
   `garrido_trigo` section)
 - `DECISIONS.md` (this entry)
+
+---
+
+## CORRECTION 2026-06-04 (10): Smillie SCP259 schema capture + loader completion
+
+Correction (7/7) locked Smillie's v1 source as Single Cell Portal SCP259
+(the CELLxGENE deposit `e373cf41-...` is a 34,772-cell
+healthy-epithelial-only subset and was rejected as unusable for v1).
+The download was deferred pending account creation + browser consent.
+
+**Status (2026-06-04).** SCP259 is downloaded, verified, and on disk at
+`~/uc-cross-atlas-data/atlases/SCP259/` (Hummingbird home, outside the
+repo, ~5 GB). Three compartment matrices (Epi/Imm/Fib) plus
+`metadata/all.meta2.txt`, all present and consistent. The schema below
+was captured empirically against the bytes on disk; the loader
+(`code/02_atlas_prep/load_smillie.py`) is written and label-coverage-
+verified but **has not yet been run end-to-end against data** — that
+happens on a Hummingbird compute node (next session) and is the gating
+step before Smillie enters any cross-atlas concordance.
+
+**Schema captured.** Layout: three gene-sorted 10X triplets under
+hashed sub-directories whose names are not stable (loader globs by
+`gene_sorted-<compartment>.matrix.mtx` filename), plus one in-band
+metadata file. The matrices are **gene-sorted = genes × cells** —
+loader transposes each to cells × genes before concat (Epi header is
+20,028 × 123,006 × 174.4M nnz; the other two are similar scale).
+`metadata/all.meta2.txt` is tab-separated with an SCP-specific `TYPE`
+boilerplate row at line 2 that must be skipped on read (`skiprows=[1]`).
+Join is **direct**: `barcodes2.tsv` values equal `NAME` in the metadata
+exactly — no donor-prefix reconstruction, no composite key. `var_names`
+are HGNC symbols (single-column, e.g. `7SK`, `A1BG`), not Ensembl;
+`ensembl_to_hgnc` takes its symbol-fallback path (dedup duplicates by
+max-expression, filter to NCBI-approved symbols).
+
+`X` ships as **raw integer counts** (MatrixMarket `coordinate integer`).
+Unlike Garrido/HCA/Pan-GI (CELLxGENE log-normalized), this loader
+applies `log1p(CP10k)` itself to keep input state uniform across all
+five atlases — the same treatment Mennillo gets and the same treatment
+Garrido will receive once correction (9)'s RAW.tar rewrite lands.
+Raw counts preserved in `layers['counts']`. `raw_count_mode=True`
+remains unsupported per correction (5/7).
+
+**Donor structure (hard invariant, fixed by study design).** 30 donors
+= 12 healthy controls + 18 UC patients. Every UC patient contributed
+**both** an inflamed and a non-inflamed biopsy (paired design), so
+`Sample` ≠ `Subject` for UC donors: 36 UC samples, 18 UC donors.
+Cell counts: 110,110 Healthy / 125,119 Inflamed / 130,263 Non-inflamed
+(~365,492 total). The loader hard-asserts `30 = 12 HC + 18 UC`; the
+365,492 total is a soft `logger.warning` tripwire per the
+correction-9 framing.
+
+**Tiers.** 51 published Smillie fine labels → 14-level broad roll-up
+via `FINE_TO_BROAD`. The broad vocab is the same 15-level shared set
+defined in `load_garrido_trigo.FINE_TO_BROAD`; Smillie populates 14 of
+the 15 — **no granulocyte** (the Smillie taxonomy has no
+neutrophils/eosinophils). Cross-atlas concordance handles the missing
+level per-atlas; no broad-vocab change needed.
+
+**Disease harmonization to Garrido vocab.** `Health` is 3-state on the
+SCP side (`Healthy` / `Inflamed` / `Non-inflamed`); the loader maps
+`Healthy → normal` and `Inflamed | Non-inflamed → ulcerative colitis`
+for cross-atlas comparability, but **preserves the raw 3-state in
+`obs['health']`** so any later inflamed-vs-pooled subsetting is a
+downstream filter, no re-load needed. See F1 below.
+
+**Loader changes (`code/02_atlas_prep/load_smillie.py`).** Replaces the
+`NotImplementedError` skeleton from correction (7/7). Hard-fail asserts
+mirror the Garrido correction-9 pattern:
+
+- Compartment-triplet file presence: matrix + `.genes.tsv` +
+  `.barcodes2.tsv` for each of Epi/Imm/Fib; loader raises if any is
+  missing or ambiguous.
+- Matrix-shape consistency: `mat.shape == (n_genes, n_barcodes)` for
+  each compartment.
+- Cell-id uniqueness post-concat.
+- Metadata column presence (`NAME`, `Cluster`, `Subject`, `Health`,
+  `Location`, `Sample`).
+- **Orphan-cell completeness** (every matrix cell must have a metadata
+  row after the `NAME` reindex).
+- Unmapped fine labels (`KeyError` listing them — directly analogous to
+  Garrido's gate).
+- Unexpected `Health` values; unexpected harmonized `disease` values.
+- **Donor structure**: `30 = 12 HC + 18 UC` hard, fixed by study
+  design.
+- Broad-tier cardinality warning if outside 10–15.
+- Cell-count tripwire (`logger.warning`) at 365,492 — same soft-gate
+  framing as Garrido's 30,068 per correction 9.
+
+**Open flags surfaced by this loader (pending OPEN_FLAGS.md).**
+
+- **F1 — UC tissue definition.** `Health` is 3-state. Loader is
+  agnostic: keeps all 30 donors, sets harmonized 2-state `disease`,
+  preserves 3-state in `obs['health']`. The inflamed-vs-pooled decision
+  must be made consistently with how Garrido and Mennillo define their
+  UC tissue.
+- **F2 — QC-state labels.** Smillie's `MT-hi` is the
+  mitochondrial-high analogue of Garrido's MT labels; collapse-vs-
+  exclude must be decided uniformly across atlases.
+- **F7 — Smillie crosswalk REVIEW rows.** Four `FINE_TO_BROAD`
+  assignments are tentative and flagged inline (`# REVIEW`): `M cells`,
+  `Immature Enterocytes 1/2`, `Secretory TA`, `MT-hi`. Loader runs with
+  best-guess parents; marker-QC at M2 will lock or move.
+- **Not a flag:** gene-identifier harmonization. `ensembl_to_hgnc`
+  converges every atlas onto the NCBI symbol set, so Smillie shipping
+  symbols needs no special mapping.
+
+**Latent observation (not a correction).** In the loader, the
+`adata.obs_names_make_unique()` call (defensive against the
+`Subject.Sample.barcode` format already being unique) is followed by an
+`if not adata.obs_names.is_unique` check that can never fire —
+`obs_names_make_unique()` modifies in place to guarantee uniqueness.
+Either drop the check or reorder to check-before-make. Captured for
+the M2 cleanup pass; not a blocker for the first Hummingbird run.
+
+**Still pending (next session, on Hummingbird).**
+
+- First end-to-end run of the loader on a compute node (`--mem=96G`,
+  `--cpus=4`, ~2 h). Pre-cache `Homo_sapiens.gene_info.gz` from the
+  login node so the symbol-validity filter does not silently skip on a
+  no-internet compute node.
+- Write `~/uc-cross-atlas-data/processed/smillie.h5ad`; back up
+  off-cluster (Hummingbird home is 1 TB but not backed up).
+- Resolve F7 REVIEW rows via marker QC at M2 (after the first scored
+  pass); move locked decisions into DECISIONS.
+- Commit `OPEN_FLAGS.md` to the repo root once drafted — file does not
+  yet exist on disk; out of scope for this commit.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_smillie.py` (replaces the (7/7) skeleton
+  with the full loader)
+- `code/02_atlas_prep/atlas_schemas.md` (smillie section: DEFERRED →
+  captured schema)
+- `DECISIONS.md` (this entry)
+

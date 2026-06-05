@@ -220,16 +220,110 @@ abundance from HCA Gut in figures.
 
 ---
 
-## smillie (DEFERRED to next session)
+## smillie
 
-- **Source**: Single Cell Portal SCP259 (NOT CELLxGENE; that deposit is
-  healthy-epithelial-only and unusable)
-- **Download URL**: TBD (requires SCP account + browser consent click)
-- **Expected n_cells**: 366,650 across 30 donors (18 UC + 12 HC)
-- **Schema**: TBD (capture after download)
+Schema captured 2026-06-04 from the SCP259 download at
+`~/uc-cross-atlas-data/atlases/SCP259/`. See DECISIONS.md correction
+(10) for the schema-capture entry and the (7/7) source-lock backstory.
 
-Placeholder loader (`load_smillie.py`) created with TODO markers; will be
-filled in after SCP259 is on disk.
+- **Matrix source**: Single Cell Portal SCP259 (NOT CELLxGENE; that
+  deposit is a 34,772-cell healthy-epithelial-only subset and is
+  unusable for v1)
+- **Download URL**: https://singlecell.broadinstitute.org/single_cell/study/SCP259
+  (requires SCP account + email verification + browser consent click on
+  the study page; bulk download via SCP CLI or web)
+- **On-disk location**: `~/uc-cross-atlas-data/atlases/SCP259/`
+  (Hummingbird home — outside the repo tree; ~5 GB)
+- **Annotation source**: in-band — `metadata/all.meta2.txt` ships with
+  the SCP bundle (no external CSV needed, unlike Garrido)
+- **n_cells**: 365,492 (110,110 Healthy + 125,119 Inflamed + 130,263 Non-inflamed)
+- **n_donors**: 30 (12 HC + 18 UC, paired — every UC patient
+  contributed BOTH an inflamed and a non-inflamed biopsy, so 36 UC
+  samples / 18 UC donors)
+- **Assay**: 10x 3' v2 / v3 (per Smillie 2019)
+
+### On-disk layout
+
+Three gene-sorted 10X triplets under hashed sub-directories (hash names
+NOT stable; the loader globs by filename), plus one metadata file:
+
+```
+expression/<hash>/  gene_sorted-Epi.matrix.mtx  Epi.genes.tsv  Epi.barcodes2.tsv
+expression/<hash>/  gene_sorted-Imm.matrix.mtx  Imm.genes.tsv  Imm.barcodes2.tsv
+expression/<hash>/  gene_sorted-Fib.matrix.mtx  Fib.genes.tsv  Fib.barcodes2.tsv
+metadata/all.meta2.txt
+cluster/{Epi,Imm,Fib}.tsne.txt   (coordinates; not used by the loader)
+```
+
+- Matrices are **gene-sorted = genes × cells** — the loader transposes
+  each to cells × genes before assembling the AnnData. Epi header is
+  20,028 genes × 123,006 cells × 174.4M nnz; the others are similar
+  scale. mmread + transpose + outer-join concat needs ~64–96 GB RAM;
+  run on a compute node, not the login node.
+- `var_names` are **HGNC symbols**, single-column (e.g. `7SK`, `A1BG`),
+  NOT Ensembl. `ensembl_to_hgnc` takes its symbol-fallback path on load.
+- `X` is **raw integer counts** (MatrixMarket `coordinate integer`).
+  Unlike Garrido/HCA/Pan-GI (which ship CELLxGENE log-normalized X),
+  this loader applies `log1p(CP10k)` itself to keep input state uniform
+  across atlases (DECISIONS correction 5/7). Raw counts preserved in
+  `layers['counts']`.
+
+### Metadata schema (`metadata/all.meta2.txt`)
+
+Tab-separated. **Line 2 is an SCP-specific `TYPE` boilerplate row that
+must be skipped on read (`pd.read_csv(..., sep="\t", skiprows=[1])`);
+header on line 1 is kept.** Columns:
+
+| column   | TYPE    | role                                                   |
+|----------|---------|--------------------------------------------------------|
+| NAME     | group   | cell id `Subject.Sample.barcode` — join key, equals `*.barcodes2.tsv` exactly (direct join, no reconstruction) |
+| Cluster  | group   | fine cell type (51 labels) → `cell_type_fine`          |
+| nGene    | numeric | genes detected → `n_genes`                             |
+| nUMI     | numeric | UMIs → `n_counts`                                      |
+| Subject  | group   | donor (e.g. `N7`) → `donor`                            |
+| Health   | group   | `Healthy` / `Inflamed` / `Non-inflamed` → `health`     |
+| Location | group   | `Epi` / `Imm` / `Fib` → `compartment`                  |
+| Sample   | group   | biopsy id (e.g. `N7.EpiA`) → `sample` (also `batch`)   |
+
+### Filter chain (v1)
+
+```python
+# No subset filter — all 30 donors are v1-relevant.
+# F1 (UC tissue definition) hooks here downstream off obs['health'];
+# the loader keeps the 3-state health column for that decision.
+```
+
+### Tiers
+
+Both tiers come from the `Cluster` column via the joined metadata.
+
+- **fine_tier**: 51 published Smillie labels. Stored in
+  `obs['cell_type_fine']`.
+- **broad_tier**: 14-level roll-up via `FINE_TO_BROAD` in
+  `load_smillie.py`. Levels: colonocyte, goblet,
+  enteroendocrine/tuft, epithelial progenitor, fibroblast, endothelium,
+  mural/glia, T cell, NK/ILC, B cell, plasma cell, monocyte/macrophage,
+  dendritic cell, mast cell. **No granulocyte** — this taxonomy has no
+  neutrophils/eosinophils, so Smillie populates 14 of the shared 15-level
+  vocab from Garrido. (Cross-atlas concordance handles the missing level
+  per-atlas; no broad-vocab change needed.)
+- **Disease** (2-state, harmonized to Garrido vocab):
+  `Healthy → normal`, `Inflamed | Non-inflamed → ulcerative colitis`.
+  The 3-state `Health` is preserved in `obs['health']` so any future F1
+  inflamed-vs-pooled subsetting is downstream-only, no re-load.
+
+### REVIEW rows (OPEN_FLAGS F7 — marker-QC at M2 to lock)
+
+Four `FINE_TO_BROAD` rows are best-guess judgment calls, not yet
+biology-locked. The loader runs with these provisional assignments
+flagged inline; M2 marker-QC moves them into DECISIONS once resolved.
+
+- `M cells` → colonocyte (microfold; no clean broad home)
+- `Immature Enterocytes 1/2` → colonocyte (progenitor/colonocyte boundary)
+- `Secretory TA` → epithelial progenitor (progenitor vs secretory lineage)
+- `MT-hi` → T cell (mitochondrial-high QC state — Smillie analogue of
+  Garrido's MT labels; F2 governs whether MT-state labels collapse vs
+  exclude uniformly across atlases)
 
 ---
 
