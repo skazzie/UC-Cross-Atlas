@@ -57,11 +57,18 @@ For every atlas, save
 Pan-GI is the immediate v1 consumer (donor-overlap exclusion at M5).
 Same schema scales to AMP-RA Phase 2 and any future integrated atlas in v2.
 
-## Pan-GI / HCA Gut raw counts verification (M1)
+## Pan-GI / HCA Gut log-normalized matrix verification (M1)
 
-Verify `adata.layers['counts']` (or equivalent) contains raw counts for
-each. If only normalized/integrated counts are accessible, drop the
-comparator to stretch — scDRS requires raw counts.
+Verify each atlas exposes a usable **log-normalized** expression matrix
+(in `.X` or a named layer). scDRS does NOT require raw counts: its
+`preprocess` operates on the log-scale matrix (gene stats are computed in
+both log and non-log scale). Raw counts are only relevant when
+`flag_raw_count=True`, which applies CP10k + log1p internally; v1 locks
+`--flag-raw-count False` uniformly across all five atlases (DECISIONS
+correction 5/7), so the log-normalized matrix is the input contract.
+Loaders that ship raw counts (Smillie SCP259, Mennillo GEO, Garrido-Trigo
+RAW.tar once the correction-9 rewrite lands) apply `log1p(CP10k)` on load
+and preserve raw counts in `layers['counts']`.
 
 ## Output
 
@@ -78,10 +85,10 @@ locked policy.
 
 | Script | Atlas | Status | Filter chain |
 |--------|-------|--------|--------------|
-| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | Production | `disease in {normal, ulcerative colitis}`; joins GEO `GSE214695_cell_annotation.csv` for full 82-fine + 15-broad tier (correction reversing 4/7) |
+| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | **Superseded** — RAW.tar rewrite pending (correction 9) | `disease in {normal, ulcerative colitis}`; was joining GEO `GSE214695_cell_annotation.csv` onto the CELLxGENE matrix by barcode, but the deposit's `obs.index` is synthetic (`cell1, cell2, ...`) so the barcode join cannot succeed. v1 will load the matrix from `GSE214695_RAW.tar` (barcodes intact) and join on `Unnamed: 0`; `log1p(CP10k)` applied on load. |
 | `load_pangi.py` | Pan-GI Extended+ (broad comparator) | Production | UC + IBD diseases x colon organs x non-organ-donor |
 | `load_hca_gut.py` | HCA Gut / Elmentaite 2021 (broad reference) | Production | `Age_group in {Adult, Adult_MLN}` x colon tissues |
-| `load_smillie.py` | Smillie 2019 (UC core) | Skeleton | SCP259 download deferred to next session |
+| `load_smillie.py` | Smillie 2019 (UC core) | Loader complete; first compute-node run pending | 30 donors (12 HC + 18 UC paired); `Health` 3-state preserved (`obs['health']`); harmonized 2-state `disease` via `HEALTH_TO_DISEASE`; `log1p(CP10k)` applied on load (raw in `layers['counts']`); 51 fine → 14 broad. See DECISIONS correction 10. |
 | `load_mennillo.py` | Mennillo 2024 (UC core) | Skeleton | GEO download deferred to next session |
 
 Each production loader exposes a `load(h5ad_path, apply_v1_filter=True,
