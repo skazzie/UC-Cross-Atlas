@@ -868,3 +868,80 @@ Files updated in this batch:
   captured schema)
 - `DECISIONS.md` (this entry)
 
+---
+
+## CORRECTION 2026-06-04 (11): HGNC remap is now pinned, strict, and gated
+
+The README HGNC-pin section described the intended behavior (pin a
+release; verify ≥95% of canonical UC GWAS hits survive); the actual
+``hgnc_remap.py`` implemented none of it. Three gaps, surfaced by the
+2026-06-04 sanity-check review:
+
+1. **No version pin.** ``ensembl_to_hgnc`` fetched
+   ``Homo_sapiens.gene_info.gz`` from NCBI live on first call, cached
+   under ``$UCC_DATA/reference/`` or ``./data/reference/``. NCBI updates
+   monthly, so two runs separated by a month would use different
+   approved-symbol sets, breaking byte-reproducibility for downstream
+   MAGMA/scDRS/seismic scores.
+2. **Synonyms in the approved set.** ``_load_ncbi_symbol_set`` pulled
+   both the ``Symbol`` and ``Synonyms`` columns into one set
+   (~68k extra strings on the 2026-05-21 snapshot, vs ~194k Symbols).
+   That made the membership filter near-permissive — deprecated
+   aliases passed through unchanged with no remap to their approved
+   form.
+3. **The canonical-hit survival check was documented but not coded.**
+   The README claimed "verify ≥95% of canonical UC GWAS hits survive";
+   no such assertion existed.
+
+A fourth, minor issue: ``adata.var_names_make_unique = False`` was set
+as an instance attribute. ``var_names_make_unique`` is an AnnData
+method; assigning ``False`` to it shadowed the method on that instance
+but did not change dedup behavior (dedup was already handled manually
+below). Removed.
+
+**Locked decision.** ``ensembl_to_hgnc`` is now pinned, strict, and
+gated.
+
+- **Pin**: a dated NCBI ``gene_info`` snapshot is committed at
+  ``data/reference/gene_info.tsv.gz``; current pin is **2026-05-21**.
+  Live-fetch removed. ``GENE_INFO_PIN_DATE`` in ``hgnc_remap.py`` is the
+  single source of truth for the pin date.
+- **Approved set**: ``Symbol`` column **only**. Synonyms are
+  deliberately excluded. If alias resolution is ever needed, it goes in
+  as an explicit alias → approved remap, not a membership test that
+  leaves the alias in place.
+- **Survival gate**: after the symbol-validity filter, the five
+  canonical UC GWAS hits in ``CANONICAL_UC_HITS`` (IL23R, JAK2, TYK2,
+  NKX2-3, ATG16L1) are checked; ``< 95%`` survival raises with a
+  diagnostic message naming the missing symbol(s). All five must
+  effectively survive (4/5 = 80% < 95% would fail). The threshold is
+  expressed as a fraction for forward-compatibility if the canonical
+  list grows.
+- **Refresh procedure**: download a fresh ``Homo_sapiens.gene_info.gz``,
+  bump ``GENE_INFO_PIN_DATE``, replace the committed snapshot in one
+  commit, and log the date bump as a new correction here.
+
+**Verified before commit.** All five canonical hits are present in the
+2026-05-21 snapshot's ``Symbol`` column (not synonyms-only), so the
+new gate passes on the current pin without any alias special-casing.
+
+**Repo size note.** ``data/reference/gene_info.tsv.gz`` is 5.1 MB —
+fine to track in git, well under the per-blob soft limit. The previous
+``data/reference/.gitkeep`` placeholder remains as the directory marker.
+
+**To refresh ahead of M2.** No action required; the current pin is
+good for at least one full M1→M2 cycle. If a new HGNC release is
+preferred, the refresh procedure above is one commit + a correction
+entry.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/hgnc_remap.py` (live fetch → pinned snapshot;
+  synonyms dropped; survival gate added; dead `var_names_make_unique`
+  attribute removed; docstring expanded)
+- `data/reference/gene_info.tsv.gz` (new; 5.1 MB; pin date 2026-05-21)
+- `code/02_atlas_prep/README.md` (HGNC pin section: described →
+  matches actual behavior)
+- `DECISIONS.md` (this entry)
+
+

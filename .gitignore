@@ -240,6 +240,9 @@ data/reference/*.fam
 data/reference/*.owl
 data/reference/*.tsv
 data/reference/*.tsv.gz
+# Pinned exception: HGNC gene_info snapshot is committed for byte-reproducible
+# remap (see code/02_atlas_prep/hgnc_remap.py and DECISIONS correction 11).
+!data/reference/gene_info.tsv.gz
 
 # Generated results — ignore everything inside but keep the folder
 results/*

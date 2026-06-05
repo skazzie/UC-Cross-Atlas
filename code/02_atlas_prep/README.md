@@ -25,9 +25,23 @@ analysis.
 
 ## HGNC pin
 
-Pin a single HGNC release (e.g., HGNC 2024-Q1) and remap every atlas.
-Verify ≥95% of canonical UC GWAS hits (IL23R, JAK2, TYK2, NKX2-3,
-ATG16L1) appear under the same symbol after harmonization.
+A dated NCBI `gene_info` snapshot is committed at
+`data/reference/gene_info.tsv.gz` (current pin: **2026-05-21**). The
+approved symbol set is built from its `Symbol` column **only** —
+synonyms are deliberately excluded so deprecated aliases cannot slip
+through the membership filter unchanged (if alias resolution is ever
+needed, it goes in as an explicit alias→approved remap, not a
+membership test).
+
+`hgnc_remap.ensembl_to_hgnc` runs as the last step of every loader and
+enforces a **hard canonical-hit survival gate**: ≥95% of the canonical
+UC GWAS hits (IL23R, JAK2, TYK2, NKX2-3, ATG16L1) must be present in
+`adata.var_names` after dedup + symbol-validity filter. A miss raises
+loudly — a missing IBD/UC locus post-remap silently biases every
+downstream score. To refresh the pin: download a fresh
+`Homo_sapiens.gene_info.gz`, update `GENE_INFO_PIN_DATE` in
+`hgnc_remap.py`, replace the committed snapshot in one commit, and
+document the date bump in DECISIONS.md.
 
 ## Atlas preprocessing policy (Option B)
 

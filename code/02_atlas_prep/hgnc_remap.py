@@ -1,21 +1,46 @@
-"""HGNC remap utility.
+"""HGNC remap utility — pinned, reproducible.
 
 CELLxGENE deposits store gene identifiers as Ensembl IDs in ``var_names``
-and the corresponding HGNC symbol in ``var['feature_name']``. Downstream
-MAGMA / scDRS / seismicGWAS code matches on HGNC symbols, so every
-loader's final step is to remap ``var_names`` to symbols and drop
-duplicates / non-canonical entries.
+and the corresponding HGNC symbol in ``var['feature_name']``. Loaders
+that ship raw symbols (Smillie SCP259, Mennillo GEO) skip the
+``feature_name`` step. Downstream MAGMA / scDRS / seismicGWAS code
+matches on HGNC symbols, so every loader's final step is to remap
+``var_names`` to symbols, drop duplicates, and filter to the
+NCBI-authoritative symbol set.
 
-Spec: ``code/02_atlas_prep/atlas_schemas.md`` and DECISIONS.md correction
-2026-05-20 (4/7), (5/7).
+Reproducibility pin
+-------------------
+The authoritative symbol set is read from a **committed, dated NCBI
+``gene_info`` snapshot** at ``data/reference/gene_info.tsv.gz``. NCBI
+updates monthly; the live-fetch version of this module produced runs
+that were not byte-reproducible. The committed snapshot is the single
+source of truth; no live URL fetch happens. To refresh the pin,
+download a new ``Homo_sapiens.gene_info.gz``, update
+``GENE_INFO_PIN_DATE`` below, replace the committed file in one commit,
+and document the date bump in DECISIONS.md.
+
+The approved set is built from the ``Symbol`` column **only**. The
+previous version also pulled in the ``Synonyms`` column, which made the
+membership filter near-permissive and let deprecated aliases pass
+through unchanged. If alias resolution is ever needed, it belongs as an
+explicit alias → approved remap, not as a membership test.
+
+Canonical-hit survival gate
+---------------------------
+After remap + dedup + symbol-validity filter, the five canonical UC
+GWAS hits in ``CANONICAL_UC_HITS`` must survive (≥95% of the list).
+This is a hard gate: if a fundamental immune/IBD locus disappears from
+an atlas after harmonization, the pipeline is silently wrong and
+downstream scores are misleading.
+
+Spec: ``code/02_atlas_prep/README.md`` (HGNC pin section);
+DECISIONS.md corrections 2026-05-20 (5/7) and 2026-06-04 (11).
 """
 
 from __future__ import annotations
 
 import gzip
 import logging
-import os
-import urllib.request
 from pathlib import Path
 
 from anndata import AnnData
@@ -24,49 +49,58 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-NCBI_GENE_INFO_URL = (
-    "https://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz"
+# NCBI gene_info dump committed to data/reference/. Update both fields
+# together if you re-pin to a fresher snapshot.
+GENE_INFO_PIN_DATE = "2026-05-21"
+_PINNED_GENE_INFO_REL = Path("data") / "reference" / "gene_info.tsv.gz"
+
+# Canonical UC GWAS hits; ≥95% must survive remap to pass the gate.
+# These are well-established IBD/UC loci (IL23R, JAK2, TYK2 = JAK-STAT
+# axis; NKX2-3, ATG16L1 = IBD susceptibility). If even one drops out
+# silently, the harmonization step is broken in a way that biases every
+# downstream score.
+CANONICAL_UC_HITS: tuple[str, ...] = (
+    "IL23R", "JAK2", "TYK2", "NKX2-3", "ATG16L1",
 )
+CANONICAL_SURVIVAL_THRESHOLD: float = 0.95
 
 
-def _gene_info_cache_path() -> Path:
-    base = os.environ.get("UCC_DATA")
-    if base:
-        cache_dir = Path(base) / "reference"
-    else:
-        cache_dir = Path("data") / "reference"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / "gene_info.tsv.gz"
+def _pinned_gene_info_path() -> Path:
+    """Resolve the committed gene_info snapshot relative to the repo root."""
+    # __file__ -> code/02_atlas_prep/hgnc_remap.py; up three is the repo root.
+    return Path(__file__).resolve().parents[2] / _PINNED_GENE_INFO_REL
 
 
 def _load_ncbi_symbol_set() -> set[str]:
-    """Authoritative HGNC-approved symbol set from NCBI gene_info.
+    """Read the committed NCBI ``gene_info`` snapshot and return its
+    ``Symbol`` column as a set.
 
-    Cached at ``$UCC_DATA/reference/gene_info.tsv.gz`` (or
-    ``./data/reference/gene_info.tsv.gz``); refetched only if missing.
+    No synonyms. Raises ``FileNotFoundError`` if the snapshot is missing
+    (the pin is required — no silent fallback).
     """
-    cache = _gene_info_cache_path()
-    if not cache.exists():
-        logger.info("Downloading NCBI gene_info to %s", cache)
-        urllib.request.urlretrieve(NCBI_GENE_INFO_URL, cache)
+    path = _pinned_gene_info_path()
+    if not path.exists():
+        raise FileNotFoundError(
+            f"HGNC remap: pinned gene_info snapshot not found at {path}. "
+            f"This file is committed to the repo at data/reference/; "
+            f"check your working copy (it should not be gitignored). "
+            f"Live-fetch is intentionally disabled — see module docstring."
+        )
     symbols: set[str] = set()
-    with gzip.open(cache, "rt", encoding="utf-8") as fh:
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
         header = fh.readline().rstrip("\n").lstrip("#").split("\t")
         sym_idx = header.index("Symbol")
-        syn_idx = header.index("Synonyms")
         for line in fh:
             parts = line.rstrip("\n").split("\t")
-            if len(parts) <= max(sym_idx, syn_idx):
+            if len(parts) <= sym_idx:
                 continue
             sym = parts[sym_idx].strip()
             if sym and sym != "-":
                 symbols.add(sym)
-            syn = parts[syn_idx].strip()
-            if syn and syn != "-":
-                for s in syn.split("|"):
-                    s = s.strip()
-                    if s:
-                        symbols.add(s)
+    logger.info(
+        "Loaded %d NCBI-approved Symbols (pin date %s)",
+        len(symbols), GENE_INFO_PIN_DATE,
+    )
     return symbols
 
 
@@ -74,13 +108,15 @@ def ensembl_to_hgnc(adata: AnnData) -> AnnData:
     """Set ``adata.var_names`` to HGNC symbols.
 
     Strategy:
-      1. Prefer ``var['feature_name']`` (HGNC symbols shipped by CELLxGENE).
-      2. Otherwise fall back to the NCBI ``gene_info`` symbol set: keep
-         var_names that are already authoritative symbols.
-      3. Drop duplicate symbols, keeping the row with highest summed
-         expression (proxy for highest-expressed isoform/loci).
-      4. Drop symbols not in the NCBI authoritative list.
-      5. Log dropped counts.
+      1. Prefer ``var['feature_name']`` (HGNC symbols shipped by
+         CELLxGENE).
+      2. Otherwise fall back to the existing ``var_names`` (loaders that
+         ship raw symbols, e.g. Smillie SCP259).
+      3. Resolve duplicate symbols by keeping the row with highest
+         summed expression (proxy for highest-expressed locus / isoform).
+      4. Drop symbols not in the pinned NCBI ``Symbol`` set.
+      5. Assert ≥95% of ``CANONICAL_UC_HITS`` survive; raise otherwise.
+      6. Log dropped counts.
 
     Returns the updated AnnData (a copy; original is not modified).
     """
@@ -95,9 +131,12 @@ def ensembl_to_hgnc(adata: AnnData) -> AnnData:
     n_in = adata.n_vars
     adata = adata.copy()
     adata.var_names = pd.Index(new_names)
-    adata.var_names_make_unique = False  # we resolve duplicates explicitly below
 
-    # 3) Resolve duplicate symbols by keeping the row with highest summed expression.
+    # 3) Resolve duplicate symbols by max-summed-expression. Summing the
+    # duplicate rows (rather than keeping the highest-expressed one) would
+    # also be defensible, but max-keep preserves a row's full sparsity
+    # pattern and avoids merging genes that share a symbol but have
+    # genuinely distinct Ensembl IDs.
     if not adata.var_names.is_unique:
         n_dup = int((adata.var_names.value_counts() > 1).sum())
         logger.info("Resolving %d duplicate HGNC symbol(s) by max-expression", n_dup)
@@ -115,26 +154,41 @@ def ensembl_to_hgnc(adata: AnnData) -> AnnData:
         adata = adata[:, mask].copy()
         logger.info(
             "Kept %d unique symbols after deduplication (was %d)",
-            adata.n_vars,
-            n_in,
+            adata.n_vars, n_in,
         )
 
-    # 4) Drop symbols not in NCBI authoritative list.
-    try:
-        approved = _load_ncbi_symbol_set()
-    except Exception as exc:  # pragma: no cover
-        logger.warning(
-            "Could not load NCBI gene_info (%s); skipping symbol-validity filter.",
-            exc,
+    # 4) Drop symbols not in the pinned NCBI Symbol set.
+    approved = _load_ncbi_symbol_set()
+    in_approved = adata.var_names.isin(approved)
+    n_drop = int((~in_approved).sum())
+    if n_drop:
+        logger.info(
+            "Dropping %d symbols not in pinned NCBI Symbol set (pin date %s)",
+            n_drop, GENE_INFO_PIN_DATE,
         )
-        approved = None
+        adata = adata[:, in_approved].copy()
 
-    if approved is not None:
-        in_approved = adata.var_names.isin(approved)
-        n_drop = int((~in_approved).sum())
-        if n_drop:
-            logger.info("Dropping %d symbols not in NCBI authoritative list", n_drop)
-            adata = adata[:, in_approved].copy()
+    # 5) Canonical-hit survival gate. Loud raise — a missing IBD GWAS hit
+    # post-remap means the harmonization is silently wrong.
+    final_names = set(adata.var_names)
+    present = [g for g in CANONICAL_UC_HITS if g in final_names]
+    survival = len(present) / len(CANONICAL_UC_HITS)
+    if survival < CANONICAL_SURVIVAL_THRESHOLD:
+        missing = [g for g in CANONICAL_UC_HITS if g not in final_names]
+        raise ValueError(
+            f"HGNC remap: canonical UC-hit survival {survival:.0%} < "
+            f"{CANONICAL_SURVIVAL_THRESHOLD:.0%}. Missing: {missing} "
+            f"(checked: {list(CANONICAL_UC_HITS)}). The input atlas does "
+            f"not carry one of the load-bearing IBD/UC GWAS loci after "
+            f"symbol harmonization — verify (a) the input gene set, "
+            f"(b) the gene_info pin (date {GENE_INFO_PIN_DATE}), and "
+            f"(c) whether the missing symbol is shipped as an alias and "
+            f"needs an explicit alias→approved remap."
+        )
+    logger.info(
+        "Canonical-hit survival: %d/%d (%.0f%%) — %s",
+        len(present), len(CANONICAL_UC_HITS), survival * 100, present,
+    )
 
     logger.info("HGNC remap: %d -> %d genes", n_in, adata.n_vars)
     return adata
