@@ -337,9 +337,20 @@ def load(
     adata = ad.concat(
         per_compartment, axis=0, join="outer", fill_value=0, merge="first",
     )
-    adata.obs_names_make_unique()  # barcodes are Subject.Sample.barcode -> already unique
+    # Do NOT call obs_names_make_unique() here. Barcodes are
+    # Subject.Sample.barcode and should be globally unique; this raise is
+    # the gate. make_unique() silently renames duplicates to <name>-1/-2,
+    # which would (a) defeat this check and (b) surface the duplicate far
+    # from its cause as an "orphan cell" in the metadata reindex below
+    # (since the renamed barcode no longer matches its NAME row).
     if not adata.obs_names.is_unique:
-        raise ValueError("Smillie loader: cell barcodes are not unique after concat.")
+        n_dup = int(adata.obs_names.duplicated().sum())
+        ex = adata.obs_names[adata.obs_names.duplicated()][:5].tolist()
+        raise ValueError(
+            f"Smillie loader: {n_dup} duplicate cell barcodes after concat "
+            f"(examples: {ex}). Subject.Sample.barcode should be globally "
+            f"unique across compartments; investigate the source files."
+        )
     logger.info("Concatenated atlas: %d cells x %d genes", adata.n_obs, adata.n_vars)
 
     # ---- 2. Join the metadata (direct: barcodes2.tsv == NAME) ----
