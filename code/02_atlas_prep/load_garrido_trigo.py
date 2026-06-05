@@ -1,7 +1,23 @@
 """Loader for Garrido-Trigo 2023 (Atlas 2, UC subset).
 
-Sources
--------
+.. warning::
+   **SUPERSEDED MATRIX SOURCE (2026-06-04, DECISIONS correction 9).**
+   This loader builds against the CELLxGENE deposit, whose ``obs.index``
+   is synthetic (``cell1, cell2, ...``) and whose original 10X barcodes
+   were stripped at deposit time. That breaks every barcode-join
+   strategy below: there is no shared key on the obs side to match
+   against ``GSE214695_cell_annotation.csv``. v1 is moving to a loader
+   that pulls the matrix from ``GSE214695_RAW.tar`` per-GSM files, where
+   barcodes are intact and the CSV's ``Unnamed: 0`` (``SC_xxx_<barcode>``)
+   is the unique, deterministic join key. The RAW.tar path also requires
+   ``log1p(CP10k)`` normalization on load to match HCA / Pan-GI (the same
+   treatment Mennillo receives) — ``--flag-raw-count False`` stays
+   uniform per correction 5/7. Rewrite scheduled alongside the Smillie
+   SCP259 download. This file is retained as reference; ``load()`` will
+   fail loudly at the barcode-join step on the CELLxGENE matrix.
+
+Sources (pre-correction-9, retained for reference)
+--------------------------------------------------
 - **Matrix:** CELLxGENE deposit ``b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad``
   (log-normalized X; var_names are Ensembl IDs; HGNC symbols in
   ``var['feature_name']``).
@@ -12,12 +28,12 @@ Sources
 The CELLxGENE-only path is deprecated: it shipped a 5-CL-lineage broad
 label with no fine tier, blocking fine-tier cross-atlas concordance for
 Garrido-Trigo. The GEO supplementary annotation restores the full
-broad + fine tier. See DECISIONS.md correction (4/7) and the correction
-reversing it.
+broad + fine tier. See DECISIONS.md correction (4/7), the correction
+reversing it (8), and correction 9 superseding the matrix source.
 
 References: ``code/02_atlas_prep/atlas_schemas.md``;
-DECISIONS.md corrections 2026-05-20 (2/7), (4/7), (5/7), and the
-correction reversing (4/7).
+DECISIONS.md corrections 2026-05-20 (2/7), (4/7), (5/7), 2026-06-03 (8),
+and 2026-06-04 (9).
 """
 
 from __future__ import annotations
@@ -55,8 +71,13 @@ EXPECTED_UC_SUBSET_N_DONORS = 12
 # The exact schema of GSE214695_cell_annotation.csv is not pinned; auto-detect
 # rather than hard-code so a schema drift surfaces as a loud error.
 _BARCODE_COL_CANDIDATES = (
+    # "Unnamed: 0" is first because in GSE214695_cell_annotation.csv it
+    # holds the unique SC_xxx_<barcode> composite, while "cell_id" is the
+    # bare 10X barcode that collides across samples (280 duplicates).
+    # _load_annotation_csv prefers candidates whose values are unique.
+    "Unnamed: 0",
     "cell_id", "cell", "Cell", "barcode", "Barcode", "cellID", "CellID",
-    "index", "Unnamed: 0",
+    "index",
 )
 _ANNOTATION_COL_CANDIDATES = (
     "annotation", "Annotation", "cluster", "Cluster", "Population",
@@ -212,17 +233,32 @@ def _normalize_label(value: object) -> object:
 
 
 def _autodetect_column(
-    df: pd.DataFrame, candidates: tuple[str, ...], purpose: str
+    df: pd.DataFrame,
+    candidates: tuple[str, ...],
+    purpose: str,
+    prefer_unique: bool = False,
 ) -> str:
-    for c in candidates:
-        if c in df.columns:
-            return c
-    raise KeyError(
-        f"GSE214695 annotation CSV: could not auto-detect {purpose} column. "
-        f"Tried {list(candidates)}. Got columns: {list(df.columns)}. "
-        f"Pass the explicit column name via the loader's "
-        f"`{purpose}_col` argument."
-    )
+    """Return the first candidate column that exists in ``df``.
+
+    If ``prefer_unique`` is True, scan all matching candidates and return
+    the first one whose values are unique. Falls back to the first match
+    if none are unique. Used for the barcode column, where picking the
+    bare-barcode ``cell_id`` over the unique ``Unnamed: 0`` composite
+    silently breaks the join.
+    """
+    matches = [c for c in candidates if c in df.columns]
+    if not matches:
+        raise KeyError(
+            f"GSE214695 annotation CSV: could not auto-detect {purpose} "
+            f"column. Tried {list(candidates)}. Got columns: "
+            f"{list(df.columns)}. Pass the explicit column name via the "
+            f"loader's `{purpose}_col` argument."
+        )
+    if prefer_unique:
+        for c in matches:
+            if not df[c].duplicated().any():
+                return c
+    return matches[0]
 
 
 def _load_annotation_csv(
@@ -243,7 +279,9 @@ def _load_annotation_csv(
     logger.info("Reading GEO annotation CSV: %s", annotation_csv_path)
     ann = pd.read_csv(annotation_csv_path)
 
-    bcol = barcode_col or _autodetect_column(ann, _BARCODE_COL_CANDIDATES, "barcode")
+    bcol = barcode_col or _autodetect_column(
+        ann, _BARCODE_COL_CANDIDATES, "barcode", prefer_unique=True
+    )
     acol = annotation_col or _autodetect_column(
         ann, _ANNOTATION_COL_CANDIDATES, "annotation"
     )
@@ -284,6 +322,11 @@ def _try_join_keys(
       3. obs.index after adding a "-1" suffix == ann[bcol].
       4. ``donor_id + "_" + obs.index`` == ann[bcol].
       5. ``ann[dcol] + "_" + ann[bcol]`` (rebuilt from CSV side) == obs.index.
+      6. obs.index after stripping a leading "SC_" prefix == ann[bcol].
+      7. ``"SC_" + donor_id + "_" + obs.index`` == ann[bcol].
+
+    Strategies 6/7 bracket the Salas-lab ``SC_xxx + sample`` cell_id
+    format used by the per-GSM matrices.
 
     The first strategy that hits every obs row (zero orphans) wins. If
     none do, raises ValueError with the best partial match for triage.
@@ -301,11 +344,20 @@ def _try_join_keys(
         obs_index.where(obs_index.str.endswith("-1"), obs_index + "-1"),
     ))
     if "donor_id" in obs.columns:
-        donor = obs["donor_id"].astype(str)
+        donor = obs["donor_id"].astype(str).to_numpy()
+        idx_np = obs_index.to_numpy()
         candidates.append((
             "donor_id + '_' + obs.index",
-            (donor + "_" + obs_index).astype(str),
+            pd.Index(donor + "_" + idx_np),
         ))
+        candidates.append((
+            "'SC_' + donor_id + '_' + obs.index",
+            pd.Index("SC_" + donor + "_" + idx_np),
+        ))
+    candidates.append((
+        "obs.index without leading SC_",
+        obs_index.str.replace(r"^SC_", "", regex=True),
+    ))
     # Strategy 5 inverts: build the CSV-side composite and try to match obs.
     if dcol is not None:
         composite = (ann[dcol].astype(str) + "_" + ann[bcol].astype(str))
@@ -373,6 +425,14 @@ def load(
             "(see DECISIONS.md correction 2026-05-20 (5/7))."
         )
 
+    logger.error(
+        "Garrido-Trigo loader: CELLxGENE matrix path is superseded by "
+        "DECISIONS correction 2026-06-04 (9). The CELLxGENE deposit's "
+        "obs.index is synthetic (cell1, cell2, ...) — barcode join cannot "
+        "succeed against the GEO CSV. Use the RAW.tar loader once it "
+        "lands; do not trust any output from this code path."
+    )
+
     logger.info("Reading %s", h5ad_path)
     adata = ad.read_h5ad(h5ad_path)
 
@@ -410,6 +470,47 @@ def load(
         joined.index = obs.index
         logger.info("Barcode join succeeded via: %s", strategy)
 
+        # Cross-check: CELLxGENE obs['disease'] must agree with the GEO sample
+        # prefix (HC*/UC*) for every cell. If they disagree, filter-before-join
+        # is silently trusting one source's definition of "UC" over the other.
+        if dcol is not None:
+            geo_prefix = (
+                joined[dcol].astype(str)
+                .str.extract(r"^([A-Za-z]+)", expand=False)
+                .str.upper()
+            )
+            prefix_to_disease = {"HC": "normal", "UC": "ulcerative colitis"}
+            unknown = sorted(set(geo_prefix.dropna()) - set(prefix_to_disease))
+            if unknown:
+                raise ValueError(
+                    f"Garrido-Trigo loader: unrecognized GEO sample prefixes "
+                    f"{unknown} in column {dcol!r}; expected HC*/UC* only "
+                    f"after the HC+UC filter. Did the filter-before-join "
+                    f"step leak CD donors, or has the sample-naming scheme "
+                    f"drifted?"
+                )
+            expected = geo_prefix.map(prefix_to_disease)
+            actual = obs["disease"].astype(str)
+            mismatch = expected.values != actual.values
+            if mismatch.any():
+                n_mis = int(mismatch.sum())
+                ex_idx = obs.index[mismatch][:5].tolist()
+                ex_actual = actual.values[mismatch][:5].tolist()
+                ex_expected = expected.values[mismatch][:5].tolist()
+                raise ValueError(
+                    f"Garrido-Trigo loader: {n_mis} cells disagree on disease "
+                    f"between CELLxGENE obs['disease'] and the GEO sample "
+                    f"prefix in {dcol!r}. The HC+UC filter and the annotation "
+                    f"source are using different definitions of who's UC. "
+                    f"Examples (obs.index / actual / expected): "
+                    f"{list(zip(ex_idx, ex_actual, ex_expected))}."
+                )
+        else:
+            logger.warning(
+                "GEO CSV has no donor/sample column; skipping the "
+                "disease/sample-prefix cross-check."
+            )
+
         fine_raw = joined[acol].map(_normalize_label)
         # Collapse Ribhi clusters into their parent before any tier logic.
         fine_collapsed = fine_raw.replace(RIBHI_TO_PARENT)
@@ -417,6 +518,21 @@ def load(
         logger.info(
             "Collapsed %d Ribhi cells into parent fine clusters", n_ribhi_collapsed
         )
+
+        # Completeness: every joined cell must carry an annotation. The join
+        # itself only guarantees barcodes matched; the matched CSV row could
+        # still have NaN in the annotation column. The unmapped check below
+        # explicitly drops NaN, so without this gate, NA annotations slip
+        # through silently and the cell is later scored with no fine label.
+        n_missing_fine = int(fine_collapsed.isna().sum())
+        if n_missing_fine:
+            raise ValueError(
+                f"Garrido-Trigo loader: {n_missing_fine}/{len(fine_collapsed)} "
+                f"cells have NaN fine annotation after the barcode join. The "
+                f"join hit every barcode but at least one matched CSV row had "
+                f"no value in column {acol!r}. Inspect the GEO CSV — partial "
+                f"annotation breaks every downstream tier."
+            )
 
         unmapped = sorted(
             set(fine_collapsed.dropna().unique()) - set(FINE_TO_BROAD.keys())
@@ -451,19 +567,41 @@ def load(
     adata.obs = obs
 
     if apply_v1_filter:
-        n_cells = adata.n_obs
+        # Donor structure is a hard invariant: 12 donors, 6 HC + 6 UC. This
+        # is fixed by the GEO study design and does not drift with re-pulls
+        # or QC nudges; a violation means the filter or annotation is wrong.
+        donors_by_disease = (
+            adata.obs[["donor", "disease"]]
+            .drop_duplicates()
+            .groupby("disease", observed=True)
+            .size()
+        )
         n_donors = int(adata.obs["donor"].nunique())
+        n_hc = int(donors_by_disease.get("normal", 0))
+        n_uc = int(donors_by_disease.get("ulcerative colitis", 0))
+        if (
+            n_donors != EXPECTED_UC_SUBSET_N_DONORS
+            or n_hc != 6
+            or n_uc != 6
+        ):
+            raise ValueError(
+                f"Garrido-Trigo loader: donor-structure invariant violated. "
+                f"Got n_donors={n_donors} ({n_hc} HC + {n_uc} UC); expected "
+                f"{EXPECTED_UC_SUBSET_N_DONORS} (6 HC + 6 UC). Per-disease "
+                f"donor breakdown: {dict(donors_by_disease)}."
+            )
+
+        # Cell count is a derived intersection (GEO ∩ CELLxGENE post-QC) and
+        # can drift for benign reasons (re-pull, QC nudge). Tripwire only —
+        # the hard gates above (completeness, donor structure, no orphans,
+        # no unmapped fine labels) are what mean "the join is broken."
+        n_cells = adata.n_obs
         if n_cells != EXPECTED_UC_SUBSET_N_CELLS:
             logger.warning(
                 "UC-subset cell count %d != expected %d "
-                "(DECISIONS.md correction 2/7). Investigate before trusting "
-                "the join.", n_cells, EXPECTED_UC_SUBSET_N_CELLS,
-            )
-        if n_donors != EXPECTED_UC_SUBSET_N_DONORS:
-            logger.warning(
-                "UC-subset donor count %d != expected %d "
-                "(DECISIONS.md correction 2/7).",
-                n_donors, EXPECTED_UC_SUBSET_N_DONORS,
+                "(DECISIONS.md correction 2/7). Tripwire only; investigate "
+                "if this drifts unexpectedly, but the hard gates have "
+                "already passed.", n_cells, EXPECTED_UC_SUBSET_N_CELLS,
             )
 
     logger.info("Post-filter cell count: %d", adata.n_obs)

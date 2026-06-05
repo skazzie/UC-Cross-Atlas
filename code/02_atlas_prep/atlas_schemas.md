@@ -10,13 +10,24 @@ Schema captured 2026-05-20.
 
 ## garrido_trigo
 
-- **Matrix source**: CELLxGENE
+> **Matrix source is changing (DECISIONS correction 9, 2026-06-04).** The
+> CELLxGENE deposit's `obs.index` is synthetic (`cell1, cell2, ...`) — the
+> 10X barcodes are stripped, so the GEO annotation cannot be joined onto
+> it deterministically. v1 moves to `GSE214695_RAW.tar` per-GSM matrices,
+> where barcodes are intact and the CSV's `Unnamed: 0` (`SC_xxx_<barcode>`)
+> is the unique join key. This section still documents the
+> pre-correction-9 schema; it will be rewritten when the RAW.tar loader
+> lands (next session, alongside Smillie SCP259). Per-donor cell counts
+> (n_cells, n_donors below) carry over unchanged because they're fixed by
+> the study design.
+
+- **Matrix source**: CELLxGENE (superseded — moving to GEO `GSE214695_RAW.tar`)
 - **Matrix download URL**: https://datasets.cellxgene.cziscience.com/b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad
 - **Matrix file size**: 176 MB
 - **Annotation source**: GEO GSE214695 supplementary file
   `GSE214695_cell_annotation.csv` (Salas-lab 91-cluster fine labels;
   NOT present in the CELLxGENE deposit — see DECISIONS.md correction
-  reversing (4/7))
+  reversing (4/7), and correction (9) superseding the matrix source)
 - **n_cells**: 46,700 (full deposit) / 30,068 (UC subset HC + UC)
 - **n_donors**: 18 (full) / 12 (UC subset: HC_1-6 + UC_1-6)
 - **Assay**: 10x 3' v3

@@ -626,3 +626,110 @@ Files updated in this batch:
 - `code/02_atlas_prep/atlas_schemas.md`
 - `README.md` (HCA Gut wording — see Section D of the to-do)
 - `DECISIONS.md` (this entry)
+
+---
+
+## CORRECTION 2026-06-04 (9): Garrido-Trigo matrix source — superseding (8)
+
+Correction (8) restored Garrido-Trigo to full broad + fine tier by joining
+the GEO supplementary annotation onto the CELLxGENE matrix by barcode.
+That join is undoable on the actual CELLxGENE deposit.
+
+**Finding (verified by running the loader on the local h5ad and CSV).**
+The CELLxGENE deposit `b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad` has a
+**synthetic** `obs.index` — values are `cell1, cell2, ..., cell46700`,
+sequential and information-free. The original 10X barcodes were dropped
+at deposit time. `observation_joinid` is a 10-character portal-internal
+tag (`LH6LS+Lnyp`, …), also not a barcode. No `obs` column carries the
+original cell barcode. Every barcode-join strategy in (8)'s loader keys
+on something derived from `obs.index`, so all seven strategies hit
+0/30,068 cells against `GSE214695_cell_annotation.csv` (which keys on
+`SC_xxx_<barcode>` in `Unnamed: 0`).
+
+Per-donor cell counts match exactly between the two sources
+(HC_1↔HC1: 1531, HC_2↔HC2: 2555, …, UC_6↔UC6: 2965), so a positional
+join within donor was considered. **Rejected.** A positional join has
+no shared key — it rests on the two files preserving the same arbitrary
+within-donor ordering, which cannot be enforced or verified. Marker-gene
+sanity checks validate populations, not per-cell correspondence: a join
+that scrambles labels for one donor (or 5% of cells) still shows
+roughly correct cluster-level marker rates while the per-cell label
+noise attenuates scDRS toward the null — i.e. it silently manufactures
+the exact cross-atlas discordance the paper is measuring. The failure
+mode is invisible at the population level. Hard no.
+
+**Locked decision.** v1 builds Garrido-Trigo from GEO primary, not the
+CELLxGENE deposit. Matrix comes from `GSE214695_RAW.tar` (per-GSM
+sparse matrices, real 10X barcodes preserved). Annotation comes from
+`GSE214695_cell_annotation.csv` as before. The join key is the
+reconstructed composite `<sample-GSM>_<barcode>` matching the CSV's
+`Unnamed: 0` (`SC_xxx_<barcode>`); auto-detect already prefers the
+unique candidate column over the duplicated bare `cell_id`. Garrido is
+the only atlas with a barcode-join requirement (Smillie/HCA/Pan-GI
+carry annotations in their own obs; Mennillo is already GEO RAW), so
+the impact is contained — no re-audit of the other four loaders is
+needed.
+
+**Normalization (satisfying (5/7), not sidestepping it).** RAW.tar is
+raw counts; HCA Gut and Pan-GI ship log-normalized. To keep the input
+state uniform across atlases, the new loader applies `log1p(CP10k)` on
+load — the identical treatment Mennillo gets. `--flag-raw-count False`
+remains uniform downstream per (5/7). The flag is *not* switched on
+for Garrido; the normalization is reproduced on the loader side so
+that downstream code sees the same input state across all five atlases.
+
+**Salvaged tonight (in this commit, no matrix path rewrite yet):**
+
+- Top-of-file docstring banner in `load_garrido_trigo.py` flagging the
+  superseded path and pointing to this correction.
+- Runtime `logger.error` at `load()` entry surfacing the same warning
+  to anyone running the loader before tomorrow's rewrite lands.
+- `_BARCODE_COL_CANDIDATES` reordered: `"Unnamed: 0"` first (carries the
+  unique `SC_xxx_<barcode>` composite); `cell_id` retained but now
+  passed over when present because it carries 280 cross-sample barcode
+  collisions in this CSV.
+- `_autodetect_column` gains a `prefer_unique` flag, used for the
+  barcode column. The duplicate-barcode check in `_load_annotation_csv`
+  (which originally caught the `cell_id` collision and gave us this
+  finding) is preserved as a backstop.
+- Three hard-invariant asserts added (correctly placed even though they
+  will not exercise until the RAW.tar loader lands):
+  1. **Annotation completeness**: zero NaN in `cell_type_fine` after the
+     join — the unmapped-label check explicitly drops NaN and would
+     otherwise let partial annotations through silently.
+  2. **Donor structure**: exactly 12 donors split 6 HC + 6 UC; this is
+     fixed by the study design and is the right gate for "the filter is
+     producing the cohort we expect."
+  3. **Disease/sample-prefix agreement**: every cell's CELLxGENE
+     `obs['disease']` matches the GEO `sample` prefix (`HC*`→normal,
+     `UC*`→ulcerative colitis). Catches the case where filter-before-join
+     and the annotation source disagree on who counts as UC.
+  4. The 30,068 cell count remains a soft `logger.warning` tripwire —
+     it's a derived intersection that can drift on re-pulls or QC
+     nudges, so a hard assert there would crash on benign changes.
+
+**Tomorrow's first task (next session, before any Hummingbird run).**
+Rewrite `load_garrido_trigo.py` matrix path:
+
+1. Download `GSE214695_RAW.tar` to scratch; untar to per-GSM sparse
+   matrices (`.mtx` + barcodes + features). 18 GSMs; the 12 HC/UC ones
+   are the v1 set.
+2. Build a `(GSM → sample-label)` map from the CSV's `sample` column
+   and the GSM-to-sample assignments in the GEO series metadata.
+3. Concatenate the 12 per-GSM matrices into a single AnnData, with
+   `obs.index` set to `<sample>_<barcode>` and `obs['donor_id']`,
+   `obs['disease']` populated from the sample label.
+4. Join `GSE214695_cell_annotation.csv` on `<sample>_<barcode>` ==
+   `Unnamed: 0` (the loader's existing strategy 5/7 path works here
+   with no further changes).
+5. Apply `log1p(CP10k)` normalization on load.
+6. Run with the three hard asserts; commit, push, score.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_garrido_trigo.py` (docstring, asserts,
+  auto-detect uniqueness preference, runtime warning; matrix path
+  unchanged — rewrite pending)
+- `code/02_atlas_prep/atlas_schemas.md` (correction-9 banner on
+  `garrido_trigo` section)
+- `DECISIONS.md` (this entry)
