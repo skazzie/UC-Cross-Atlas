@@ -4,7 +4,7 @@ Running list of judgment calls and unresolved questions surfaced during the buil
 not yet decided. The companion to DECISIONS.md: that file is *locked* decisions, this is
 the *still-open* side. When a flag is resolved, log it in DECISIONS.md and strike it here.
 
-_Last updated: June 4, 2026._
+_Last updated: June 6, 2026._
 
 ---
 
@@ -65,6 +65,24 @@ boundary); `Secretory TA` (→ epithelial progenitor, vs secretory/goblet
 lineage); `MT-hi` (→ T cell, QC state — see F2). The loader runs with these in
 place; they are not biology-locked.
 - **Bites at:** crosswalk (M2).
+
+## F8 · Fine-tier cross-atlas harmonization layer (blocks the fine concordance axis)
+`06_concordance` compares atlases on the *string intersection* of cell-type
+labels (`set(scores_a) & set(scores_b)`). Broad tier works because
+CANONICAL_BROAD forces identical strings; fine tier has no equivalent — loaders
+emit each atlas's *native* fine labels (Smillie 51 `Cluster`, Garrido
+91-collapsed, Mennillo TBD) and no canonical-fine vocab/crosswalk exists. Native
+labels won't string-match across studies (even "Inflammatory Fibroblasts" vs
+"Inflammatory fibroblasts"), so the fine intersection is near-empty and the
+README's k=20 fine-tier Jaccard is undeliverable as wired.
+Need: a fine-harmonization layer (canonical fine vocab, or per-atlas crosswalk
+to shared names). Achievable shared fine set = subtypes biologically alignable
+AND ≥ MIN_CELLS_PER_TYPE (50) in all three atlases ≈ a few dozen well-defined
+types; study-specific inflammatory states excluded/caveated. Cannot be confirmed
+until the Mennillo loader exists (3-way intersection bounded by worst atlas).
+- **Bites at:** fine-tier concordance (step 06); gates the fine-tier novelty
+  axis (the gap Li et al. 2025 flag as future work). Scope before banking fine
+  tier as a headline result.
 
 > Note: gene-identifier harmonization is **not** a separate flag. Smillie ships
 > HGNC symbols and Garrido/Pan-GI/HCA ship Ensembl, but every loader's final
