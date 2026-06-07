@@ -247,6 +247,10 @@ data/reference/*.tsv.gz
 # canonical broad-tier vocabulary (DECISIONS correction 13).
 !data/reference/cl_terms_pinned.tsv
 
+# MAGMA prepare_gwas.py intermediates (regenerable from upstream sumstats)
+data/gwas/*.snp.loc
+data/gwas/*.pval
+
 # Generated results — ignore everything inside but keep the folder
 results/*
 !results/.gitkeep

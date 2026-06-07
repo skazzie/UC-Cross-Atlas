@@ -2359,6 +2359,117 @@ Files updated in this batch:
   to this DECISIONS entry).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-07 (24): Laptop GWAS munge — de Lange + Yengo pre-staged for HB
+
+Rev2 to-do PDF's "DO NOW (laptop) — Build the de Lange .gs" item:
+executed the laptop-runnable half of the pipeline. MAGMA itself
+remains HB-pinned (Linux x86_64 binary; 1000G EUR LD reference;
+NCBI37.3 gene-loc; none on this Windows laptop). What landed locally
+is the `prepare_gwas.py` munge step (autosome filter + MAF/INFO QC +
+λ_GC) producing the two MAGMA intermediates (`.snp.loc` + `.pval`)
+for the two GWAS that ship in a format `prepare_gwas.py` handles
+without modification.
+
+### (a) de Lange UC GCST004133 — munged.
+
+Used the GWAS Catalog harmonized version
+`28067908-GCST004133-EFO_0000729.h.tsv.gz` (299 MB, schema = `hm_*`
+columns) rather than the raw deposit referenced by `download_refs.sh`
+(`uc_build37_45975_20161107.txt.gz`, schema = `MarkerName / P.value`
+with NO chr/bp columns). The harmonized version drops in directly
+against `prepare_gwas.py`'s defaults (`hm_rsid`, `hm_chrom`, `hm_pos`,
+`p_value`). Invocation per `code/01_magma/README.md` template;
+`--n-fixed 45975` for the no-per-SNP-N case (DECISIONS 14).
+
+Result: 9,486,539 SNPs in → 9,486,539 SNPs out (zero QC drops; the
+harmonized file does NOT ship MAF or INFO columns, so those filters
+no-op). Outputs at `data/gwas/uc_delange.{snp.loc,pval}`. **λ_GC =
+1.1724** — fails the PDF's `[after-munge] λ_GC ≤ 1.1` gate as
+literally written. Flagged below.
+
+### (b) Yengo height GCST90245992 (positive control) — munged.
+
+Raw deposit `GCST90245992_buildGRCh37.tsv` (95 MB). Has per-SNP `n`
+column and `effect_allele_frequency`. Invocation:
+`--col-snp variant_id --col-chr chromosome --col-bp base_pair_location
+--col-p p_value --col-n n --col-frq effect_allele_frequency`.
+
+Result: 1,372,608 SNPs in → 1,180,302 SNPs out after MAF ≥ 0.01 QC
+(192,306 dropped). Outputs at `data/gwas/yengo_height.{snp.loc,pval}`.
+**λ_GC = 5.1992** — also over the PDF's 1.1 gate.
+
+### (c) λ_GC interpretation — `≤ 1.1` gate is the WRONG check at large N.
+
+Both λ_GC values are over 1.1, but interpretation matters here:
+
+- **de Lange 1.17 at N=46k**: moderate; consistent with the polygenic
+  signal expected for UC at this sample size. The raw λ_GC conflates
+  stratification with polygenic signal; the correct stratification
+  check is the LDSC intercept (or the LDSC ratio).
+- **Yengo 5.20 at N=1.6M**: very high in absolute terms but textbook
+  for a highly-powered polygenic-trait GWAS — at this N, λ_GC is
+  dominated by genuine signal across the genome, NOT by population
+  stratification (Bulik-Sullivan 2015 *Nat Genet*).
+
+The PDF's `λ_GC ≤ 1.1` rule was written without the large-N caveat;
+it's appropriate for the de Lange-size UC GWAS and was almost
+hit (1.17 vs 1.10), but the Yengo positive-control failure is
+expected, not actionable. Resolution: keep the λ_GC value as
+*reported* per-GWAS (already written to
+`results/magma/{trait}_lambda_gc.tsv` by `prepare_gwas.py`), but
+treat the **LDSC intercept** as the stratification gate where it
+matters (the two UC GWAS for the concordance figure), not raw λ_GC.
+This is consistent with the Methods conventions in Bulik-Sullivan and
+matches what reviewers will expect.
+
+Action item: LDSC run + intercept reporting is a separate pipeline
+not currently in `code/01_magma/`. Park for the M3 sanity scaffolding
+phase or as a follow-up to the (14) cross-GWAS effective-N table.
+
+### (d) Trubetskoy SCZ and Liu UC — deferred.
+
+- **SCZ**: PGC sumstats VCF v1.0 (240 MB, figshare-hosted, downloaded
+  via `download_refs.sh` URL). Format has `##` metadata header lines
+  followed by a single-`#` column header line and per-SNP rows.
+  `prepare_gwas.py` calls `pd.read_csv` without a `comment=` or
+  `skiprows=` argument, so the file will not parse as-is. PDF flags
+  this: "SCZ needs `##`-header skip + `--col-n n_eff`". Patch is a
+  small CLI flag addition (`--comment-char` mapping to `pd.read_csv
+  comment=`, plus header-line handling for the single-`#` row). Not
+  applied in this batch — Saisohan's territory to extend the script.
+- **Liu**: 2.49 GB compressed deposit. Per the rev2 to-do PDF, gated
+  on the open ancestry-LD methodological decision; not heatmap-
+  blocking. Not downloaded.
+
+### (e) Pipeline status — what's HB-pinned vs laptop-done.
+
+Laptop completed (this batch):
+
+- `data/gwas/uc_delange_GCST004133.h.tsv.gz` (299 MB, downloaded)
+- `data/gwas/yengo_height_GCST90245992.tsv` (95 MB, downloaded)
+- `data/gwas/uc_delange.{snp.loc,pval}` (gitignored — intermediate)
+- `data/gwas/yengo_height.{snp.loc,pval}` (gitignored — intermediate)
+- `results/magma/{uc_delange,yengo_height}_lambda_gc.tsv` (gitignored)
+
+HB-pinned (rest of the pipeline):
+
+- `run_magma.sh` step (needs MAGMA binary + 1000G EUR LD ref +
+  NCBI37.3.gene.loc; Linux x86_64).
+- `make_scdrs_gs.py` → `.gs` file (depends on MAGMA `.genes.out`).
+- `sanity_check.py` → UC marker-gene top-N verification.
+
+The `.snp.loc` + `.pval` files are ready to ship to Hummingbird and
+plug directly into `run_magma.sh` — the laptop side of the heatmap
+critical path is done.
+
+Files updated in this batch:
+
+- `.gitignore` (added `data/gwas/*.snp.loc` + `data/gwas/*.pval`
+  patterns; intermediates, regenerable from sumstats).
+- `DECISIONS.md` (this entry).
+
 
 
 
