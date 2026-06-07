@@ -106,6 +106,37 @@ _TAR_ENTRY_RE = re.compile(
 # Required columns in GSE214695_cell_annotation.csv.
 _CSV_REQUIRED_COLS = ("sample", "cell_id", "annotation")
 
+# Canonical broad vocabulary — loader-local until CANONICAL_BROAD is
+# formally locked (see code/_shared/canonical_broad_DRAFT.md). The
+# loader runs two assertions against this set:
+#   (1) At module load: every value in FINE_TO_BROAD must be a member.
+#       Catches typos in the map at authoring time (e.g. the live F8
+#       preview "Perycites" -> if the value side had been typo'd, this
+#       would have fired at import, not at step 06).
+#   (2) At end of load(): every distinct value of obs['cell_type_broad']
+#       must be a member. Catches anything that slips past (1) — e.g.
+#       a stringified NaN landing in the column via an unexpected path.
+# Kept loader-local rather than imported from code/_shared/ to avoid
+# premature coupling against a vocab that may shift on lock; promote
+# to code/_shared/ when CANONICAL_BROAD locks.
+_BROAD_VOCAB: frozenset[str] = frozenset({
+    "B cell",
+    "NK/ILC",
+    "T cell",
+    "colonocyte",
+    "dendritic cell",
+    "endothelium",
+    "enteroendocrine/tuft",
+    "epithelial progenitor",
+    "fibroblast",
+    "goblet",
+    "granulocyte",
+    "mast cell",
+    "monocyte/macrophage",
+    "mural/glia",
+    "plasma cell",
+})
+
 
 # Ribhi = ribosomal-high cross-lineage transcriptional state, not a lineage.
 # Verified empirically: top-20 markers of every Ribhi cluster are dominated
@@ -228,6 +259,20 @@ FINE_TO_BROAD = {
     "Eosinophils":    "granulocyte",
     "Cycling myeloid":"monocyte/macrophage",
 }
+
+# Gate (1): validate the map's value side against the canonical vocab
+# at module import. A typo on the value side would otherwise survive
+# every per-cell assertion and land as a phantom broad category at
+# step 06 — read as discordance, not as the typo it is.
+_unmapped_broad = set(FINE_TO_BROAD.values()) - _BROAD_VOCAB
+if _unmapped_broad:
+    raise ValueError(
+        f"load_garrido_trigo.FINE_TO_BROAD ships broad values outside "
+        f"_BROAD_VOCAB: {sorted(_unmapped_broad)}. Likely a typo on the "
+        f"value side of the map (see canonical_broad_DRAFT.md for the "
+        f"15-term vocabulary)."
+    )
+del _unmapped_broad
 
 
 def _normalize_label(value: object) -> object:
@@ -579,6 +624,23 @@ def load(
         )
 
     broad = fine_collapsed.map(FINE_TO_BROAD)
+
+    # Gate (2): every emitted broad label must be in the canonical vocab.
+    # The map-side gate (1) catches typos in FINE_TO_BROAD values at
+    # import; this gate catches anything that lands a non-canonical
+    # string in the broad column via a path other than the map (e.g.
+    # stringified NaN). Hard-raise so a typo cannot quietly become a
+    # phantom non-matching category at step 06's string intersection.
+    emitted = set(broad.dropna().unique())
+    unrecognized = emitted - _BROAD_VOCAB
+    if unrecognized:
+        raise ValueError(
+            f"Garrido-Trigo loader: emitted cell_type_broad values "
+            f"{sorted(unrecognized)} are not in the canonical vocab. "
+            f"Either FINE_TO_BROAD's value side is broken (see gate 1) "
+            f"or a non-map path is populating the broad column."
+        )
+
     n_broad = int(broad.nunique())
     n_fine = int(fine_collapsed.nunique())
     logger.info(

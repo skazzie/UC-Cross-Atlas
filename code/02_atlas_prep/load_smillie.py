@@ -117,6 +117,34 @@ HEALTH_TO_DISEASE = {
     "Non-inflamed": "ulcerative colitis",
 }
 
+# Canonical broad vocabulary — loader-local until CANONICAL_BROAD is
+# formally locked (see code/_shared/canonical_broad_DRAFT.md). The
+# loader runs two assertions against this set:
+#   (1) At module load: every value in FINE_TO_BROAD must be a member.
+#   (2) At end of load(): every distinct obs['cell_type_broad'] must be
+#       a member.
+# Smillie naturally populates 14 of the 15 (no granulocyte — its
+# taxonomy has no neutrophils/eosinophils); the canonical set still
+# includes granulocyte so the same frozenset can be promoted to
+# code/_shared/ unchanged when CANONICAL_BROAD locks.
+_BROAD_VOCAB: frozenset[str] = frozenset({
+    "B cell",
+    "NK/ILC",
+    "T cell",
+    "colonocyte",
+    "dendritic cell",
+    "endothelium",
+    "enteroendocrine/tuft",
+    "epithelial progenitor",
+    "fibroblast",
+    "goblet",
+    "granulocyte",
+    "mast cell",
+    "monocyte/macrophage",
+    "mural/glia",
+    "plasma cell",
+})
+
 # Fine -> broad roll-up into the SHARED 15-level vocab defined in
 # load_garrido_trigo.FINE_TO_BROAD / atlas_schemas.md. Smillie populates 14 of
 # the 15 (no granulocyte: this taxonomy has no neutrophils/eosinophils).
@@ -203,6 +231,21 @@ FINE_TO_BROAD = {
     "CD69+ Mast":             "mast cell",
     "CD69- Mast":             "mast cell",
 }
+
+# Gate (1): validate the map's value side against the canonical vocab
+# at module import. Catches typos on the value side at authoring time —
+# the live F8 preview (Garrido's "Perycites" typo) is exactly the
+# failure mode this prevents from sneaking past per-cell asserts and
+# landing as a phantom non-matching category at step 06.
+_unmapped_broad = set(FINE_TO_BROAD.values()) - _BROAD_VOCAB
+if _unmapped_broad:
+    raise ValueError(
+        f"load_smillie.FINE_TO_BROAD ships broad values outside "
+        f"_BROAD_VOCAB: {sorted(_unmapped_broad)}. Likely a typo on the "
+        f"value side of the map (see canonical_broad_DRAFT.md for the "
+        f"15-term vocabulary)."
+    )
+del _unmapped_broad
 
 
 def _normalize_label(value: object) -> object:
@@ -396,6 +439,21 @@ def load(
             f"entry: {unmapped}. Extend the map (load_smillie.FINE_TO_BROAD)."
         )
     broad = fine.map(FINE_TO_BROAD)
+
+    # Gate (2): every emitted broad label must be in the canonical vocab.
+    # Map-side gate (1) catches typos at authoring; this catches anything
+    # that lands a non-canonical string in the broad column via a path
+    # other than the map. Hard-raise so a typo cannot quietly become a
+    # phantom non-matching category at step 06's string intersection.
+    emitted_broad = set(broad.dropna().unique())
+    unrecognized = emitted_broad - _BROAD_VOCAB
+    if unrecognized:
+        raise ValueError(
+            f"Smillie loader: emitted cell_type_broad values "
+            f"{sorted(unrecognized)} are not in the canonical vocab. "
+            f"Either FINE_TO_BROAD's value side is broken (see gate 1) "
+            f"or a non-map path is populating the broad column."
+        )
 
     health = aligned["Health"].astype(str)
     bad_health = sorted(set(health.unique()) - set(HEALTH_VALUES))
