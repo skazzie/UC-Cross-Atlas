@@ -2080,3 +2080,225 @@ Files updated in this batch:
   per-region diff).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-07 (22): Broad-tier lock — QC-state collapse, lineage-ambiguous-cycling exclusion, CL wrong-ID resolution
+
+Three Tier-1 biology calls (gate the 3×3 broad concordance figure) and
+one Tier-2 cleanup (gate the v2 CANONICAL_BROAD lock), bundled here so
+the cross-atlas rules land together and the loaders, the draft vocab
+doc, and the CL pin all reflect the same lock atomically.
+
+Sequencing note: this entry follows Saisohan's 2026-06-07 biology
+review of the Tier-1 punch list. The flagged single mis-take in my
+proposal — locking the unprefixed Garrido `Cycling cells *` to B cell —
+is reversed here as a uniform cross-atlas exclusion rule, which is the
+only resolution that doesn't manufacture a B-cell harmonization
+artifact in the first headline figure.
+
+### (a) `QC_STATE_TO_PARENT` — collapse, not exclude (resolves OPEN_FLAGS F2).
+
+Six Garrido fine labels live on a cross-lineage QC-state axis parallel
+to Ribhi: `MT T cells`, `MT fibroblasts`, `IER fibroblasts`,
+`PC IgA heat shock 1/2`, `PC immediate early response`. The broad-tier
+target for each is already biologically correct in `FINE_TO_BROAD`
+(stress doesn't change lineage); what was missing was the fine-tier
+collapse-to-parent that Ribhi already gets. New cross-atlas map
+`code/02_atlas_prep/_qc_policy.QC_STATE_TO_PARENT` chains alongside
+`RIBHI_TO_PARENT` in each loader. Smillie's single `MT-hi` cluster
+stays mapped directly at broad in `load_smillie.FINE_TO_BROAD` (it's
+one Imm-compartment label, no fine-tier collapse buys anything);
+TAURUS imports the map but it's a no-op until first-run surfaces its
+low-tier label set.
+
+**Policy: collapse-to-parent, NOT exclude.** Reasoning: MT-hi cells are
+stressed-but-viable in the deposit's own QC (Smillie SCP259 ran MT%
+filters before publishing the 51-cluster annotation; the Salas-lab
+Garrido annotation likewise gates on MT% before assigning the MT-T /
+MT-fib clusters — these are stressed cells, not dying-cell residue).
+Heat-shock and IER are dissociation artifacts overlaid on real
+lineages; the original lineage call survives. Exclusion would drop
+cells asymmetrically (Garrido has 6 stress labels, Smillie has 1,
+TAURUS unknown) and would change the soft cell-count tripwires; the
+collapse keeps cells and only removes QC noise from the fine tier.
+
+**Cross-atlas-rule status, not Garrido+Smillie patch.** The map lives
+in `_qc_policy.py` precisely so TAURUS labels surface into the same
+map (not into the TAURUS loader) when the low-tier set is enumerated,
+preserving cross-atlas symmetry by construction rather than by-copy.
+Same architectural pattern as `_broad_vocab._BROAD_VOCAB` (DECISIONS
+20) — duplicate-by-copy is the drift risk this fixes.
+
+**PRE-BANK GATE on the first broad-tier figure (NOT a footnote).**
+Before treating the 3×3 broad heatmap as real, confirm the MT-hi
+cluster cell counts in *each* atlas are consistent with the deposit's
+own MT% QC having actually passed (Salas-lab Garrido fine-tier table;
+SCP259 Smillie 51-cluster metadata). The collapse policy assumes
+"stressed-but-viable, kept by deposit QC" — if a deposit silently
+shipped sub-threshold MT% cells in those clusters, collapse-to-parent
+quietly scores dying cells into our lineages and the figure inherits
+the bias. Tracked as **OPEN_FLAGS F9 (MT% pre-bank gate)** — do not
+bank the heatmap without it. Cheap to check, expensive to miss. If
+sub-threshold cells slipped through, the resolution is to drop those
+specific cells, NOT change the cross-atlas collapse rule.
+
+**Forward note (Phase 9 — compositional confound).** Whether stress-
+state cell fractions correlate with disease state (more MT-hi / more
+heat-shock in inflamed tissue) is a compositional-confound question
+that bites at the concordance step, not at the load. Park for the
+Phase 9 compositional-confound check; don't relitigate inside the QC
+policy. If the check surfaces a stress-fraction × disease correlation,
+the answer is a sensitivity panel (re-run concordance with stress-
+state cells held out), not a change to the v1 collapse rule.
+
+### (b) `EXCLUDE_LINEAGE_AMBIGUOUS_FINE` — uniform exclusion of unprefixed cycling (resolves OPEN_FLAGS F3).
+
+Garrido's `Cycling cells`, `Cycling cells 2`, `Cycling cells 3` carry
+proliferation markers (MKI67+ etc) without a stable lineage call —
+they're labeled by clustering position in the Salas-lab tree, not by
+marker-confirmed compartment. My initial proposal locked these to B
+cell at broad (following the Salas-lab tree placement); Saisohan
+flagged this as the single assignment that could manufacture a false
+cross-atlas result — if Smillie or TAURUS happens to place its
+analogous cycling cells anywhere else (T, or a separate cycling
+bucket), the broad heatmap would report a B-cell discordance that's
+pure harmonization artifact, and "B cells disagree across atlases" is
+exactly the failure mode a reviewer dismisses with "that's just your
+cycling-cell handling."
+
+**Resolution: drop these cells from broad scoring, uniformly, in all
+three loaders.** New cross-atlas frozenset
+`code/02_atlas_prep/_qc_policy.EXCLUDE_LINEAGE_AMBIGUOUS_FINE`,
+applied before the FINE_TO_BROAD lookup in every loader; logs the
+drop count loudly so the exclusion is auditable. Smillie currently
+adds zero labels (all its cycling clusters are compartment-prefixed:
+`Cycling B`, `Cycling T`, `Cycling Monocytes`, `Cycling TA` — kept,
+lineage-tagged). TAURUS imports the set; populated when low-tier
+labels surface and any analogous unprefixed cycling cluster appears.
+
+**Why symmetric exclusion is the bounded move.** Cycling-cell
+fractions are small in every UC atlas (typically a few percent at
+most); exclusion is bounded in cell-count impact and symmetric across
+atlases by construction. Force-assignment is neither — its discordance
+contribution scales with the asymmetry of how each atlas's annotators
+happened to place cycling cells, which is exactly the unknown we
+can't audit pre-figure.
+
+**Revisit path.** The marker-QC step already on the build plan
+(MKI67 + lineage markers in the included-cells diagnostic pass) is
+where these cells get reinstated per-cell, but only when markers AND
+cross-atlas placement agree. The exclusion is a structural floor on
+the v1 figure, not a permanent drop.
+
+The Garrido `FINE_TO_BROAD` no longer ships entries for the three
+unprefixed cycling labels — they go through the EXCLUDE step before
+the unmapped-label gate; the previous B-cell entries are deleted.
+Also added: identity row `"plasma cell": "plasma cell"` to Garrido's
+`FINE_TO_BROAD`, as the target of `QC_STATE_TO_PARENT`'s plasma-cell
+collapse path (PC IgA heat shock 1/2, PC immediate early response).
+
+### (c) Garrido broad-tier lock — 9 of 12 REVIEW rows confirmed (resolves OPEN_FLAGS F4 broad-tier portion).
+
+The 12 OPEN_FLAGS F4 REVIEW rows are biology calls on Garrido fine
+labels with non-obvious broad-tier placement. After Saisohan's review,
+9 rows lock with their current `load_garrido_trigo.FINE_TO_BROAD`
+assignment; the other 3 are the unprefixed cycling cells just handled
+in (b) above. Locked assignments:
+
+| Garrido fine label | Current broad | Rationale |
+|---|---|---|
+| Laminin colonocytes | colonocyte | Basement-membrane-adjacent colonocyte subtype — colonocyte at broad. Fold-vs-distinct at fine is an F8 question, not a broad call. |
+| PLCG2 colonocytes | colonocyte | Inflammation-associated colonocyte subtype (PLCG2 = UC GWAS gene). Broad = colonocyte. F8 question whether to fold. |
+| Inflammatory colonocyte | colonocyte | State-flavored colonocyte. Broad clean. |
+| Mature goblet | goblet | Terminally differentiated goblet. Broad clean. F8 question whether to fold to Goblet. |
+| Paneth-like | goblet | Colon lacks canonical Paneth; Paneth-like = secretory anti-microbial epithelium. Broad placement under goblet (secretory) defensible — split-out would create a 16th broad term for a rare population, against the 10–15 budget. |
+| CD4 ANXA1 | T cell | CD4+ ANXA1+ T cells (Th1/Treg-adjacent). Broad clean. |
+| S1PR1 T cells | T cell | S1PR1+ naive/memory T cells. Broad clean. |
+| T cells CCL20 | T cell | Th17-skewed T cells. Broad clean. |
+| PC IGLL5 | plasma cell | IGLL5-expressing plasma cells. Broad clean. F8 question on isotype grouping. |
+
+The remaining fine-tier identity questions (fold-vs-distinct for
+Laminin / PLCG2 colonocytes, Mature goblet, PC IGLL5 isotype
+grouping) flow to F8. Broad tier is **locked**.
+
+### (d) CL pin — three wrong-ID rows resolved (DECISIONS 13 follow-up).
+
+The CL pin (13) caught six DRAFT errors: three label-drift renames
+(closed by 2026-06-06 doc edits, T1.3 verified the doc matches the
+pinned tsv) and three flat-out wrong IDs. The wrong-ID rows are
+resolved here.
+
+| Drafted slot | Wrong ID | Resolution | OLS-confirmed last-modified |
+|---|---|---|---|
+| intestinal stem cell | CL:1000280 (was "smooth muscle cell of colon") | **Drop.** Use existing pinned `CL:0002250` *intestinal crypt stem cell*. | n/a — already pinned |
+| colon epithelial progenitor cell | CL:0009039 (was "colon goblet cell") | **Replace with `CL:0009010`** *transit amplifying cell* (generic TA term; "of colon" subtype does not exist in 2026-03-26). | 2024-04-03 |
+| enteric glial cell | CL:0002073 (was "transitional myocyte") | **Replace with `CL:4040002`** *enteroglial cell* (exact synonym: "enteric glial cell"; parent of CL:4047047 type I enteric glial cell). | 2023-04-03 |
+
+Both replacement IDs have OLS last-modification dates that comfortably
+predate the 2026-03-26 pin date, so the labels we capture here are
+stable for that release. **Pin provenance: same-release post-hoc
+additions.** The pin's release-date provenance is unchanged — these
+are within-release adds keyed against the live OLS, NOT a refresh of
+the pin to a newer release. The cl_terms_pinned.tsv has a comment
+block delimiting the post-hoc additions; the OWL itself remains
+2026-03-26.
+
+**Direct OWL membership verification (2026-06-07).** Saisohan flagged
+that OLS reflects the live ontology, not the 2026-03-26 snapshot;
+"pin that lies" was the failure mode. Verified directly against the
+local 65.88 MB `cl.owl` (versionIRI
+`http://purl.obolibrary.org/obo/cl/releases/2026-03-26/cl.owl`,
+versionInfo `2026-03-26`): grep confirms `CL_4040002` and `CL_0009010`
+both have `owl:Class` declarations in the pinned OWL. Labels match the
+tsv (`enteroglial cell` with exactSynonym `enteric glial cell`;
+`transit amplifying cell`). Pin membership is established for this
+release, not assumed from OLS.
+
+**v2 polish (deferred).** Two same-release children exist that would
+add specificity without changing broad-tier mapping (parent subtree
+semantics cover both):
+
+- `CL:0009043` *intestinal crypt stem cell of colon* — colon-specific
+  child of `CL:0002250`.
+- `CL:4047017` *transit amplifying cell of gut* — gut-specific child
+  of `CL:0009010` (added 2024-09-24 per the OWL `terms:date`); closer
+  fit to Saisohan's original "of colon / of gut" framing than the
+  generic CL:0009010 that locked here. Lock stayed on the generic to
+  preserve the signed-off scope; upgrade is a one-line swap in
+  `canonical_broad_DRAFT.md` and the pinned tsv when v2 polish runs.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/_qc_policy.py` (new — `QC_STATE_TO_PARENT`,
+  `EXCLUDE_LINEAGE_AMBIGUOUS_FINE`; cross-atlas rule module).
+- `code/02_atlas_prep/load_garrido_trigo.py` (import `_qc_policy`;
+  drop the three unprefixed `Cycling cells *` rows from `FINE_TO_BROAD`;
+  add `"plasma cell": "plasma cell"` identity row; apply EXCLUDE +
+  QC-state collapse in the fine-label processing block).
+- `code/02_atlas_prep/load_smillie.py` (import `_qc_policy`; apply
+  EXCLUDE + QC-state collapse for symmetry — both no-ops on the
+  current SCP259 label set; lift the `MT-hi # REVIEW` comment).
+- `code/02_atlas_prep/load_taurus.py` (import `_qc_policy`; apply
+  EXCLUDE + QC-state collapse hook in `_finalize`; both no-ops until
+  LOW_TO_BROAD populates on first compute-node run).
+- `code/_shared/canonical_broad_DRAFT.md` (CL pin error table updated
+  to "Resolution" column; rows 4 / 7 of the candidate vocabulary
+  updated to cite CL:0009010 and CL:4040002 respectively; CL:1000280
+  dropped).
+- `data/reference/cl_terms_pinned.tsv` (post-hoc same-release append
+  block for CL:0009010 and CL:4040002 with provenance comment).
+- `OPEN_FLAGS.md` (F2 / F3 / F4 moved to Resolved; F7 narrowed to its
+  fine-tier-only portion; F8 expanded with T2.5 CL-aware fine-vocab
+  analytical sketch).
+- `DECISIONS.md` (this entry).
+
+The 3×3 broad-tier concordance figure is now unblocked on the biology
+side. Remaining gate is the loader-runs-clean check on a compute node
+(MT% spot-check from caveat (a); Garrido + Smillie load output; no
+TAURUS dependency for the first figure since CD/HC arms are dropped
+and the broad axis can be computed pairwise).
+
+
+
+
+

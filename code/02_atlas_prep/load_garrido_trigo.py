@@ -116,6 +116,7 @@ _CSV_REQUIRED_COLS = ("sample", "cell_id", "annotation")
 # 1 would have caught it in one loader but not the others if the
 # frozenset itself drifted). See DECISIONS (20).
 from _broad_vocab import _BROAD_VOCAB
+from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE, QC_STATE_TO_PARENT
 
 
 # Ribhi = ribosomal-high cross-lineage transcriptional state, not a lineage.
@@ -198,9 +199,14 @@ FINE_TO_BROAD = {
     "Memory B cell":  "B cell",
     "Naive B cell":   "B cell",   # whitespace/unicode-normalized form
     "GC B cell":      "B cell",
-    "Cycling cells":  "B cell",   # B/plasma cycling pool
-    "Cycling cells 2":"B cell",
-    "Cycling cells 3":"B cell",
+    # ``Cycling cells`` / ``Cycling cells 2`` / ``Cycling cells 3`` are
+    # NOT here: they are lineage-ambiguous (no compartment prefix; the
+    # original Salas-lab placement is by clustering position, not
+    # marker-confirmed lineage). Per DECISIONS (22) they go into
+    # ``EXCLUDE_LINEAGE_AMBIGUOUS_FINE`` so the load drops them before
+    # the broad-tier map runs — force-assigning to B cell would create
+    # a cross-atlas discordance that's pure harmonization artifact.
+    "plasma cell":    "plasma cell",   # identity row — target of QC_STATE_TO_PARENT collapse
     "PC IER":                     "plasma cell",
     "PC immediate early response":"plasma cell",  # GEO long-form synonym
     "PC IGLL5":                   "plasma cell",
@@ -581,11 +587,40 @@ def load(
             f"{list(zip(ex_idx, ex_act, ex_exp))}."
         )
 
-    # ---- 6. Fine-label processing: RIBHI collapse, completeness, unmapped. ----
+    # ---- 6. Fine-label processing: EXCLUDE → RIBHI → QC-state collapse. ----
     fine_raw = aligned["annotation"].map(_normalize_label)
-    fine_collapsed = fine_raw.replace(RIBHI_TO_PARENT)
-    n_ribhi = int((fine_raw != fine_collapsed).sum())
-    logger.info("Collapsed %d Ribhi cells into parent fine clusters", n_ribhi)
+
+    # (a) Lineage-ambiguous cycling clusters — drop cells before the broad
+    # mapping. Cross-atlas rule from _qc_policy.EXCLUDE_LINEAGE_AMBIGUOUS_FINE
+    # (DECISIONS 22): force-assigning unprefixed cycling labels to any broad
+    # term would manufacture cross-atlas discordance that's pure harmonization
+    # artifact. Drop is symmetric across loaders.
+    exclude_mask = fine_raw.isin(EXCLUDE_LINEAGE_AMBIGUOUS_FINE)
+    n_excl = int(exclude_mask.sum())
+    if n_excl:
+        excl_labels = sorted(set(fine_raw[exclude_mask].astype(str)))
+        logger.info(
+            "EXCLUDE_LINEAGE_AMBIGUOUS_FINE: dropping %d cells across %d "
+            "fine labels %s (DECISIONS 22; revisit in marker-QC step).",
+            n_excl, len(excl_labels), excl_labels,
+        )
+        keep = (~exclude_mask).values
+        adata = adata[keep].copy()
+        aligned = aligned.loc[adata.obs_names]
+        fine_raw = aligned["annotation"].map(_normalize_label)
+
+    # (b) Ribhi → parent, then QC-state (MT / heat-shock / IER) → parent.
+    # Applied in series; both replace-maps key on raw labels so order
+    # doesn't matter for correctness, but Ribhi-first preserves the
+    # historical log message granularity.
+    fine_after_ribhi = fine_raw.replace(RIBHI_TO_PARENT)
+    fine_collapsed = fine_after_ribhi.replace(QC_STATE_TO_PARENT)
+    n_ribhi = int((fine_raw != fine_after_ribhi).sum())
+    n_qc = int((fine_after_ribhi != fine_collapsed).sum())
+    logger.info(
+        "Collapsed %d Ribhi + %d QC-state (MT/heat-shock/IER) cells into "
+        "parent fine clusters (DECISIONS 22).", n_ribhi, n_qc,
+    )
 
     n_missing_fine = int(fine_collapsed.isna().sum())
     if n_missing_fine:

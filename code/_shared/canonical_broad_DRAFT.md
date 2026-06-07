@@ -49,29 +49,37 @@ committed (re-downloadable from
 single source of truth for what each CL ID *meant* at the time we
 recorded it; refresh procedure documented in the TSV header.
 
-**CL pin caught six errors in the draft — flagged inline below.** The
-2026-03-26 lookup against the IDs originally drafted produced three
-label-drift renames (same concept, name updated upstream) and three
-flat-out wrong IDs. The label-drift cases just need the doc updated;
-the three wrong-ID cases are real biology calls Muskaan needs to make:
+**CL pin caught six errors in the draft — all resolved as of
+2026-06-07 (DECISIONS 22).** The 2026-03-26 lookup against the IDs
+originally drafted produced three label-drift renames (same concept,
+name updated upstream) and three flat-out wrong IDs. Label drifts:
+doc updated. Wrong-ID rows: ontology-investigated against the pinned
+release via OLS and resolved — two replacement IDs verified-existing
+in the 2026-03-26 release and appended to `cl_terms_pinned.tsv` as
+same-release post-hoc additions (DECISIONS 22), one wrong ID dropped
+in favor of an already-pinned correct sibling.
 
-| Drafted ID | Drafted label | Actual label in 2026-03-26 | Severity |
+| Drafted ID | Drafted label | Actual label in 2026-03-26 | Resolution |
 |---|---|---|---|
-| CL:1000347 | enterocyte of colon | colonocyte | label drift (same concept) |
-| CL:0002204 | brush cell of intestine / tuft | tuft cell | label drift |
-| CL:0002138 | lymphatic endothelial cell | endothelial cell of lymphatic vessel | label drift |
-| **CL:1000280** | stem cell of intestine | **smooth muscle cell of colon** | **WRONG ID** |
-| **CL:0009039** | colon epithelial progenitor cell | **colon goblet cell** | **WRONG ID** |
-| **CL:0002073** | enteric glial cell | **transitional myocyte** | **WRONG ID** |
+| CL:1000347 | enterocyte of colon | colonocyte | label drift — doc updated |
+| CL:0002204 | brush cell of intestine / tuft | tuft cell | label drift — doc updated |
+| CL:0002138 | lymphatic endothelial cell | endothelial cell of lymphatic vessel | label drift — doc updated |
+| ~~CL:1000280~~ | stem cell of intestine | (smooth muscle cell of colon) | **dropped** — CL:0002250 *intestinal crypt stem cell* (already pinned) covers the intended concept |
+| ~~CL:0009039~~ | colon epithelial progenitor cell | (colon goblet cell) | **replaced by CL:0009010** *transit amplifying cell* (post-hoc pin add) |
+| ~~CL:0002073~~ | enteric glial cell | (transitional myocyte) | **replaced by CL:4040002** *enteroglial cell* (exact synonym: "enteric glial cell"; post-hoc pin add) |
 
-Reverse-lookup ("does the intended concept exist by exact label?")
-also returned NOT FOUND for `enteric glial cell`,
-`enterocyte of colon`, `brush cell of intestine`,
-`stem cell of intestine`, `colon epithelial progenitor cell`, and
-`lymphatic endothelial cell`. So the three WRONG-ID rows don't have a
-trivial relabel — they need actual ontology investigation. Until they
-do, the canonical-vocab rows that referenced them are flagged in the
-table below with `[CL ID UNRESOLVED — see pin verification]`.
+CL:0009010 last-modified 2024-04-03 and CL:4040002 last-modified
+2023-04-03 (per OLS); both **directly verified present** in the local
+65.88 MB 2026-03-26 OWL on 2026-06-07 (`owl:Class rdf:about=...CL_4040002`
+and `...CL_0009010` declarations; labels match the tsv). The post-hoc
+additions are same-release — the pin's release-date provenance is
+unchanged.
+
+v2 polish (deferred): CL:0009043 *intestinal crypt stem cell of colon*
+is a colon-specific subtype of CL:0002250 that exists in the release;
+not added to the v1 vocab because the broad-tier rows are anchored on
+the parent CL:0002250 already and adding the colon-specific child
+doesn't change broad-tier mapping.
 
 ---
 
@@ -135,10 +143,10 @@ densely.
 | 1 | `colonocyte` | CL:1000347 (pinned label: **colonocyte**); CL:0011108 (colon epithelial cell) is parent | Absorptive epithelium. **Garrido (6):** Colonocyte 1/2, Inflammatory colonocyte, BEST4 OTOP2, Laminin colonocytes, PLCG2 colonocytes. **Smillie (5):** Enterocytes, Best4+ Enterocytes, Immature Enterocytes 1/2 (F7 pending), M cells (F7 pending, microfold). |
 | 2 | `goblet` | CL:0000160 (goblet cell); CL:1000320 (large intestine goblet) | Mucus-secreting epithelium. **Garrido (3):** Goblet, Mature goblet, Paneth-like (currently here pending F4). **Smillie (2):** Goblet, Immature Goblet. |
 | 3 | `enteroendocrine/tuft` *(OPEN: split or keep)* | CL:0000164 (enteroendocrine cell); CL:0002204 (pinned label: **tuft cell**) | Distinct lineages bundled as one rare-epithelial-sensor category — biology call open. **Garrido (2):** Enteroendocrine, Tuft cells. **Smillie (2):** Enteroendocrine, Tuft. |
-| 4 | `epithelial progenitor` | CL:0002250 (intestinal crypt stem cell); ~~CL:1000280 (stem cell of intestine)~~ **[CL ID UNRESOLVED — pinned label is "smooth muscle cell of colon"]**; ~~CL:0009039 (colon epithelial progenitor cell)~~ **[CL ID UNRESOLVED — pinned label is "colon goblet cell"]** | Stem + transit-amplifying + cycling epithelial. **Garrido (2):** Cycling TA, Secretory progenitor. **Smillie (6):** Stem, TA 1, TA 2, Cycling TA, Secretory TA (F7 pending), Enterocyte Progenitors. Only CL:0002250 is verified for this term in 2026-03-26; the other two slots need biology lookup. |
+| 4 | `epithelial progenitor` | CL:0002250 (intestinal crypt stem cell); CL:0009010 (transit amplifying cell) | Stem + transit-amplifying + cycling epithelial. **Garrido (2):** Cycling TA, Secretory progenitor. **Smillie (6):** Stem, TA 1, TA 2, Cycling TA, Secretory TA, Enterocyte Progenitors. CL:0009010 *transit amplifying cell* is the generic TA term; replaces the wrong-ID draft slots ~~CL:1000280~~ / ~~CL:0009039~~ per DECISIONS 22. Same-release children for v2 polish: CL:0009043 *intestinal crypt stem cell of colon* (colon-specific child of CL:0002250); CL:4047017 *transit amplifying cell of gut* (gut-specific child of CL:0009010, added 2024-09-24, verified in the pinned OWL). Both subsumed by their parents under subtree semantics — not added here. |
 | 5 | `fibroblast` *(includes pericyte — mural/glia split)* | CL:0000057 (fibroblast) + descendants; **+ CL:0000669 (pericyte)** | Mesenchymal stromal. **Garrido (11):** S1, S1.2, S2a, S2b, S3, IER fibroblasts, Inflammatory fibroblasts, MT fibroblasts, Myofibroblasts, FRCs, Perycites. **Smillie (9):** WNT2B+ Fos-lo 1/2, WNT2B+ Fos-hi, WNT5B+ 1/2, RSPO3+, Inflammatory Fibroblasts, Myofibroblasts, Pericytes. |
 | 6 | `endothelium` | CL:0000115 (endothelial cell) + descendants (incl. CL:0002138, pinned label: **endothelial cell of lymphatic vessel**) | Vascular + lymphatic. **Garrido (3):** Endothelium, Activated endothelium, Lymphatic endothelium. **Smillie (3):** Endothelial, Microvascular, Post-capillary Venules. |
-| 7 | `glia` *(new — mural/glia split)* | ~~CL:0002073 (enteric glial cell)~~ **[CL ID UNRESOLVED — pinned label is "transitional myocyte"; the concept "enteric glial cell" does not exist by exact label in CL 2026-03-26]**; CL:0000125 (glial cell) is the verified general parent | Neural-crest, distinct from mesenchymal pericyte. **Garrido (1):** Glia. **Smillie (1):** Glia. HCA: maps from `Neuronal` category subset — confirms cross-atlas resolution. The enteric-specific CL ID needs ontology lookup before promotion. |
+| 7 | `glia` *(new — mural/glia split)* | CL:4040002 (enteroglial cell — exact synonym "enteric glial cell"); CL:0000125 (glial cell) is the verified general parent | Neural-crest, distinct from mesenchymal pericyte. **Garrido (1):** Glia. **Smillie (1):** Glia. HCA: maps from `Neuronal` category subset — confirms cross-atlas resolution. CL:4040002 replaces the wrong-ID draft slot ~~CL:0002073~~ per DECISIONS 22; OLS lookup against the live ontology confirms exact-synonym "enteric glial cell" and parent of CL:4047047 (type I enteric glial cell), with last-modification 2023-04-03 — predates the 2026-03-26 pin. |
 | 8 | `T cell` | CL:0000084 (T cell) + descendants | **Garrido (15):** CD4 ANXA1, CD4 naive, CD8 CTL, CD8 CTL TRM, CD8 FGFBP2, Cycling T cells, DN EOMES, DN TNF, MT T cells (F2 pending), S1PR1 T cells, T cells CCL20, ThF, Tregs, gd IEL, MAIT. **Smillie (10):** CD4+ Memory, CD4+ Activated Fos-hi/lo, CD4+ PD1+, CD8+ LP, CD8+ IELs, CD8+ IL17+, Tregs, Cycling T, MT-hi (F2/F7 pending). |
 | 9 | `NK/ILC` | CL:0000623 (natural killer cell); CL:0001065 (innate lymphoid cell) | **Coherent union** — NK is group-1 ILC under current taxonomy. Cross-atlas grouping preserves the biology. **Garrido (2):** NK, ILC3. **Smillie (2):** NKs, ILCs. |
 | 10 | `B cell` | CL:0000236 (B cell) + descendants | **Garrido (7):** B cell, Memory B cell, Naive B cell, GC B cell, Cycling cells, Cycling cells 2, Cycling cells 3 (F3 pending). **Smillie (3):** Follicular, GC, Cycling B. |

@@ -35,3 +35,14 @@ CL:0000097	mast cell	mast cell	yes
 CL:0000094	granulocyte	granulocyte	yes
 CL:0000775	neutrophil	neutrophil	yes
 CL:0000771	eosinophil	eosinophil	yes
+# --- Post-hoc additions 2026-06-07 (DECISIONS 22) ---
+# Same 2026-03-26 release. Labels captured from live OLS lookup against
+# the active Cell Ontology; both terms' last-modification dates predate
+# the pin release date (CL:0009010 = 2024-04-03; CL:4040002 = 2023-04-03),
+# so the labels here are stable for 2026-03-26. These two rows replace
+# the wrong-ID slots CL:0009039 and CL:0002073 in canonical_broad_DRAFT.md
+# row 4 (epithelial progenitor) and row 7 (glia) respectively. The pin's
+# release-date provenance is unchanged — these are within-release adds,
+# not a refresh.
+CL:0009010	transit amplifying cell	transit amplifying cell of colon (DRAFT slot was CL:0009039 colon epithelial progenitor cell)	post-hoc
+CL:4040002	enteroglial cell	enteric glial cell (DRAFT slot was CL:0002073 enteric glial cell)	post-hoc

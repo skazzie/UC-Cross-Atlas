@@ -223,6 +223,7 @@ _HIERARCHY_CANDIDATES = {
 # were a drift risk that 06_concordance would have reported as biology.
 # Gate (1) at module load + gate (2) at end-of-load. See DECISIONS (20).
 from _broad_vocab import _BROAD_VOCAB
+from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE, QC_STATE_TO_PARENT
 
 # Map from TAURUS `low`-tier labels into the canonical broad vocab.
 # Ships EMPTY in this v0 — the `low`-tier label set is not in the paper
@@ -669,6 +670,39 @@ def _finalize(
         )
 
     adata.obs = new_obs
+
+    # ---- 7b. Cross-atlas QC policy (DECISIONS 22), applied AFTER the
+    # broad map for TAURUS because the EXCLUDE filter keys on cell_type_fine
+    # (109 cell states) and the QC collapse keys on cell_type_low — and
+    # both maps ship empty for TAURUS until the first-run label set
+    # surfaces. The hook is wired now so when Muskaan populates
+    # _qc_policy.{QC_STATE_TO_PARENT, EXCLUDE_LINEAGE_AMBIGUOUS_FINE} with
+    # TAURUS labels alongside LOW_TO_BROAD, the symmetry with Garrido /
+    # Smillie is structural, not by-copy. Applied here (not before the
+    # LOW_TO_BROAD lookup) only because LOW_TO_BROAD is currently empty
+    # and gate (2) above guards the broad column already; once
+    # LOW_TO_BROAD is populated this block moves up to live before the
+    # lookup (TODO taurus-first-run-followup).
+    fine_str = adata.obs["cell_type_fine"].astype(str)
+    excl_mask = fine_str.isin(EXCLUDE_LINEAGE_AMBIGUOUS_FINE)
+    n_excl = int(excl_mask.sum())
+    if n_excl:
+        excl_labels = sorted(set(fine_str[excl_mask]))
+        logger.info(
+            "EXCLUDE_LINEAGE_AMBIGUOUS_FINE: dropping %d cells across %d "
+            "fine labels %s (DECISIONS 22; revisit in marker-QC).",
+            n_excl, len(excl_labels), excl_labels,
+        )
+        adata = adata[(~excl_mask).values].copy()
+    low_pre_qc = adata.obs["cell_type_low"].astype(str)
+    low_post_qc = low_pre_qc.replace(QC_STATE_TO_PARENT)
+    n_qc = int((low_pre_qc != low_post_qc).sum())
+    if n_qc:
+        logger.info(
+            "Collapsed %d QC-state cells into parent low-tier clusters "
+            "(DECISIONS 22).", n_qc,
+        )
+        adata.obs["cell_type_low"] = low_post_qc.astype("category")
 
     if run_donor_assert:
         per_donor = adata.obs["donor"].value_counts()

@@ -124,6 +124,20 @@ HEALTH_TO_DISEASE = {
 # 06_concordance silently report vocab drift as biology. See DECISIONS
 # (20). Smillie naturally populates 14 of 15 (no granulocyte).
 from _broad_vocab import _BROAD_VOCAB
+# Cross-atlas QC policy (DECISIONS 22). Both maps are no-ops on the
+# current SCP259 51-cluster label set — every Smillie cycling cluster
+# is compartment-prefixed (kept), and Smillie's single stress label
+# ``MT-hi`` is mapped directly to "T cell" in this module's own
+# FINE_TO_BROAD below (single Imm-compartment cluster, no fine-tier
+# collapse buys anything).
+# CAVEAT: the shared module does NOT guard Smillie's MT-hi mapping —
+# that mapping lives in this loader's FINE_TO_BROAD. If a future edit
+# changes the MT-hi → T cell entry here, the cross-atlas QC rule will
+# NOT catch the drift. Edits to MT-hi (or analogous QC-state Smillie
+# labels added later) must be either (a) routed through QC_STATE_TO_PARENT
+# in _qc_policy.py, or (b) reviewed against DECISIONS 22 to preserve the
+# cross-atlas symmetry that the policy module exists to enforce.
+from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE, QC_STATE_TO_PARENT
 
 # Fine -> broad roll-up into the SHARED 15-level vocab defined in
 # load_garrido_trigo.FINE_TO_BROAD / atlas_schemas.md. Smillie populates 14 of
@@ -184,7 +198,7 @@ FINE_TO_BROAD = {
     "CD8+ IL17+":             "T cell",
     "Tregs":                  "T cell",
     "Cycling T":              "T cell",
-    "MT-hi":                  "T cell",               # REVIEW/QC: mito-high state (F2); verify lineage/exclude
+    "MT-hi":                  "T cell",               # QC-state (mito-high); kept here as the single-label Imm-compartment cluster, not collapsed via QC_STATE_TO_PARENT (DECISIONS 22). MT% viability passed by SCP259 QC.
 
     # --- NK / ILC ---
     "NKs":                    "NK/ILC",
@@ -412,6 +426,37 @@ def load(
 
     # ---- 3. Build the standard obs schema ----
     fine = aligned["Cluster"].map(_normalize_label)
+
+    # Cross-atlas QC policy (DECISIONS 22): same EXCLUDE + collapse rules
+    # as Garrido / TAURUS, imported from _qc_policy so the symmetry is
+    # structural. Both are no-ops on Smillie's current SCP259 51-cluster
+    # set (all cycling labels are compartment-prefixed; the only stress
+    # state is the single ``MT-hi`` cluster, mapped at broad in
+    # FINE_TO_BROAD without a fine-tier collapse — see the comment on
+    # that row). Kept here so a future relabel that introduces an
+    # unprefixed cycling or MT-style cluster doesn't silently bypass
+    # the rule.
+    excl_mask = fine.isin(EXCLUDE_LINEAGE_AMBIGUOUS_FINE)
+    n_excl = int(excl_mask.sum())
+    if n_excl:
+        excl_labels = sorted(set(fine[excl_mask].astype(str)))
+        logger.info(
+            "EXCLUDE_LINEAGE_AMBIGUOUS_FINE: dropping %d cells across %d "
+            "fine labels %s (DECISIONS 22).", n_excl, len(excl_labels), excl_labels,
+        )
+        keep = (~excl_mask).values
+        adata = adata[keep].copy()
+        aligned = aligned.loc[adata.obs_names]
+        fine = aligned["Cluster"].map(_normalize_label)
+    fine_collapsed = fine.replace(QC_STATE_TO_PARENT)
+    n_qc = int((fine != fine_collapsed).sum())
+    if n_qc:
+        logger.info(
+            "Collapsed %d QC-state cells into parent fine clusters "
+            "(DECISIONS 22).", n_qc,
+        )
+    fine = fine_collapsed
+
     unmapped = sorted(set(fine.unique()) - set(FINE_TO_BROAD))
     if unmapped:
         raise KeyError(
