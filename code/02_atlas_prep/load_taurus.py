@@ -112,48 +112,65 @@ COLONIC_REGION_KEYS: tuple[str, ...] = (
 )
 ILEAL_REGION_KEYS: tuple[str, ...] = ("ileum", "ileal")
 
-# Timepoint values that count as baseline. Substring match after
-# normalization to lower-case + stripped.
-BASELINE_TIMEPOINT_KEYS: tuple[str, ...] = (
-    "baseline", "pretreatment", "pre-treatment", "pre_treatment",
+# Timepoint values that count as baseline. Matched by EXACT equality
+# after lower-case + whitespace-normalize. **Includes the bare token
+# `"pre"`** — TAURUS Supp Table 1B uses "Pre"/"Post" verbatim, and a
+# substring-style match in the wrong direction would have silently
+# dropped TAURUS's "Pre" rows on the first run (bug caught 2026-06-06
+# via Supp Table 1 dry-run; see DECISIONS 20).
+BASELINE_TIMEPOINT_KEYS: frozenset[str] = frozenset({
+    "pre", "baseline", "pretreatment", "pre-treatment", "pre_treatment",
     "w0", "week 0", "week_0", "wk0", "v1", "visit 1", "visit_1",
-)
+})
 
-# ---- Donor-count expectations (Thomas 2024) -----------------------------
-# After the disease=UC × colonic × baseline filter, the surviving donor
-# count is bounded above by the full UC cohort (22; Fig. 2b) and below by
-# whichever subset of those 22 actually contributed a pretreatment colonic
-# sample (the paper's baseline analysis cohort in Fig. 4c is 4 + 13 = 17
-# UC patients with pretreatment samples, AFTER their own inflamed filter
-# that we are NOT applying here). True value depends on the obs metadata
-# in the pooled file and is captured on first run; ranges below are for
-# diagnostics, not hard gates.
-EXPECTED_N_UC_DONORS_RANGE: tuple[int, int] = (15, 22)
+# ---- Donor + sample expectations (Supp Table 1B, dry-run 2026-06-06) ----
+# Derived empirically by filtering Supplementary Table 1B
+# (Disease == "UC" & Site in colonic & Treatment == "Pre"). All 22 UC
+# patients contributed at least one Pre colonic sample (no patient is
+# excluded by the v1 filter chain). Fig. 4c's smaller cohort (4 + 13 =
+# 17) results from the paper's *additional* inflamed-baseline filter
+# which (18)(a) deliberately does NOT apply.
+EXPECTED_N_UC_DONORS_POST_FILTER: int = 22
+# 52 = 39 Inflamed + 13 Non_Inflamed UC × colonic × Pre samples.
+EXPECTED_N_UC_SAMPLES_POST_FILTER: int = 52
+
+# Inflammation breakdown of the v1 cohort (informational; F1 governs
+# whether the subset gets further split before concordance):
+#   n(inflammation_score > 6.5)  ≈ 31
+#   n(inflammation_score ≤ 6.5)  ≈ 21
+#   inflammation_score range     ≈ [0.00, 8.98]
 
 # Cell count post-filter is not pinned anywhere in the paper Methods —
 # left as a soft tripwire on first run.
 EXPECTED_N_CELLS_HINT: int | None = None  # set after first-run capture
 
 # ---- Schema auto-detect candidates --------------------------------------
+# Candidate name lists are TAURUS-Supp-Table-1B-confirmed first, then
+# fallbacks. Auto-detect returns the first that exists in obs.columns.
 _DONOR_COL_CANDIDATES = (
+    "Patient",  # TAURUS Supp Table 1B
     "patient_id", "Patient_ID", "donor_id", "Donor_ID",
-    "patient", "Patient", "subject", "Subject", "subject_id",
+    "patient", "subject", "Subject", "subject_id",
 )
 _DISEASE_COL_CANDIDATES = (
-    "diagnosis", "Diagnosis", "disease", "Disease",
+    "Disease",  # TAURUS Supp Table 1B
+    "diagnosis", "Diagnosis", "disease",
     "condition", "Condition", "disease_status", "group",
 )
 _REGION_COL_CANDIDATES = (
+    "Site",  # TAURUS Supp Table 1B
     "region", "Region", "tissue", "Tissue",
-    "anatomical_region", "site", "Site", "location", "Location",
+    "anatomical_region", "site", "location", "Location",
     "biopsy_site", "tissue_region",
 )
 _TIMEPOINT_COL_CANDIDATES = (
+    "Treatment",  # TAURUS Supp Table 1B ("Pre" / "Post")
     "timepoint", "Timepoint", "time_point", "visit", "Visit",
     "week", "Week", "treatment_status", "treatment_timepoint",
     "sample_timepoint", "visit_id",
 )
 _INFLAMMATION_COL_CANDIDATES = (
+    "Inflammation_score",  # TAURUS Supp Table 1B (capital I; numeric)
     "inflammation_score", "Inflammation_Score", "inflammation",
     "Inflammation", "inflammation_grade", "infl_score",
     "macroscopic_inflammation", "endoscopic_inflammation",
@@ -170,27 +187,11 @@ _HIERARCHY_CANDIDATES = {
                     "Annotation", "annotation", "cellstate"),
 }
 
-# ---- Canonical broad vocab (same 15 as Garrido + Smillie) ---------------
-# Loader-local until CANONICAL_BROAD locks per canonical_broad_DRAFT.md.
-# Gate (1) at module load + gate (2) at end-of-load (same pattern as the
-# Garrido + Smillie loaders; F8-preview defense).
-_BROAD_VOCAB: frozenset[str] = frozenset({
-    "B cell",
-    "NK/ILC",
-    "T cell",
-    "colonocyte",
-    "dendritic cell",
-    "endothelium",
-    "enteroendocrine/tuft",
-    "epithelial progenitor",
-    "fibroblast",
-    "goblet",
-    "granulocyte",
-    "mast cell",
-    "monocyte/macrophage",
-    "mural/glia",
-    "plasma cell",
-})
+# ---- Canonical broad vocab (single-sourced; same 15 in every loader) ----
+# Single-sourced from sibling _broad_vocab module. Loader-local copies
+# were a drift risk that 06_concordance would have reported as biology.
+# Gate (1) at module load + gate (2) at end-of-load. See DECISIONS (20).
+from _broad_vocab import _BROAD_VOCAB
 
 # Map from TAURUS `low`-tier labels into the canonical broad vocab.
 # Ships EMPTY in this v0 — the `low`-tier label set is not in the paper
@@ -264,10 +265,14 @@ def _canonicalize_disease(value: object) -> str | None:
 
 
 def _is_baseline(value: object) -> bool:
+    """True iff the normalized value equals a known baseline token.
+
+    Exact match (not substring) because Supp Table 1B uses "Pre"/"Post"
+    (3 / 4 chars) which a substring `key in t` would have dropped (no
+    member of BASELINE_TIMEPOINT_KEYS is a substring of "pre").
+    """
     t = _normalize_token(value)
-    if not t:
-        return False
-    return any(key in t for key in BASELINE_TIMEPOINT_KEYS)
+    return bool(t) and t in BASELINE_TIMEPOINT_KEYS
 
 
 def _is_colonic(value: object) -> bool:
@@ -474,13 +479,10 @@ def load(
     # Replace obs with our augmented one (carries _disease_canon).
     adata_sub.obs = obs
 
-    # ---- 5. Donor-structure check — logged expected-range, not a hard pin. ----
-    # The exact count of UC patients with a pretreatment colonic sample
-    # is not in the paper Methods; it lives in Supp Table 1. The upper
-    # bound is 22 (full UC cohort) and Fig. 4c shows 17 with pretreatment
-    # samples after the paper's own inflamed filter (which we don't
-    # apply). Hard-fail only on impossible values; warn outside the
-    # expected range; per-donor breakdown always logged for triage.
+    # ---- 5. Donor + sample invariants from Supp Table 1B dry-run. ----
+    # Hard pins derived from the actual Supp Table 1 metadata (DECISIONS
+    # 20). All 22 UC patients have at least one Pre colonic sample;
+    # total 52 samples across the 22.
     n_uc_donors = int(adata_sub.obs[dcol].nunique())
     breakdown = adata_sub.obs[dcol].value_counts().head(30).to_dict()
     if n_uc_donors == 0 or n_uc_donors > 60:
@@ -490,19 +492,34 @@ def load(
             f"misconfigured (e.g., wrong column auto-detected). "
             f"Per-donor cell counts (top 30): {breakdown}."
         )
-    lo, hi = EXPECTED_N_UC_DONORS_RANGE
-    if not (lo <= n_uc_donors <= hi):
-        logger.warning(
-            "TAURUS UC donor count %d is outside the expected range "
-            "[%d, %d] (Thomas 2024). Not a hard failure — could be a "
-            "metadata drift or a per-Supp-Table-1 reconciliation that "
-            "hasn't happened yet. Per-donor cell counts (top 30): %s",
-            n_uc_donors, lo, hi, breakdown,
+    if n_uc_donors != EXPECTED_N_UC_DONORS_POST_FILTER:
+        raise ValueError(
+            f"TAURUS loader: UC donor count {n_uc_donors} != expected "
+            f"{EXPECTED_N_UC_DONORS_POST_FILTER} (Supp Table 1B, "
+            f"DECISIONS 20). The Supp Table is the empirical ground "
+            f"truth for the v1 subset; a mismatch means metadata drift "
+            f"in the h5ad obs vs the paper, OR a filter is wrong. "
+            f"Per-donor cell counts (top 30): {breakdown}."
         )
+    logger.info(
+        "Donor invariant passed: %d UC donors (matches Supp Table 1B).",
+        n_uc_donors,
+    )
+
+    # Sample count check (soft warning, not hard — the h5ad may have
+    # collapsed some sample distinctions post-QC).
+    if "sample_id" in adata_sub.obs.columns:
+        n_samples = int(adata_sub.obs["sample_id"].nunique())
+    elif "Batch" in adata_sub.obs.columns:
+        n_samples = int(adata_sub.obs["Batch"].nunique())
     else:
-        logger.info(
-            "UC donor count %d within expected range [%d, %d]; %d donors "
-            "in this subset.", n_uc_donors, lo, hi, n_uc_donors,
+        n_samples = None
+    if n_samples is not None and n_samples != EXPECTED_N_UC_SAMPLES_POST_FILTER:
+        logger.warning(
+            "TAURUS UC sample count %d != expected %d (Supp Table 1B). "
+            "Soft tripwire; could be a benign QC drop. Hard donor gate "
+            "above has already passed.",
+            n_samples, EXPECTED_N_UC_SAMPLES_POST_FILTER,
         )
 
     if EXPECTED_N_CELLS_HINT is not None and adata_sub.n_obs != EXPECTED_N_CELLS_HINT:

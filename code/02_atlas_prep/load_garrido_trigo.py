@@ -106,36 +106,16 @@ _TAR_ENTRY_RE = re.compile(
 # Required columns in GSE214695_cell_annotation.csv.
 _CSV_REQUIRED_COLS = ("sample", "cell_id", "annotation")
 
-# Canonical broad vocabulary — loader-local until CANONICAL_BROAD is
-# formally locked (see code/_shared/canonical_broad_DRAFT.md). The
-# loader runs two assertions against this set:
-#   (1) At module load: every value in FINE_TO_BROAD must be a member.
-#       Catches typos in the map at authoring time (e.g. the live F8
-#       preview "Perycites" -> if the value side had been typo'd, this
-#       would have fired at import, not at step 06).
-#   (2) At end of load(): every distinct value of obs['cell_type_broad']
-#       must be a member. Catches anything that slips past (1) — e.g.
-#       a stringified NaN landing in the column via an unexpected path.
-# Kept loader-local rather than imported from code/_shared/ to avoid
-# premature coupling against a vocab that may shift on lock; promote
-# to code/_shared/ when CANONICAL_BROAD locks.
-_BROAD_VOCAB: frozenset[str] = frozenset({
-    "B cell",
-    "NK/ILC",
-    "T cell",
-    "colonocyte",
-    "dendritic cell",
-    "endothelium",
-    "enteroendocrine/tuft",
-    "epithelial progenitor",
-    "fibroblast",
-    "goblet",
-    "granulocyte",
-    "mast cell",
-    "monocyte/macrophage",
-    "mural/glia",
-    "plasma cell",
-})
+# Canonical broad vocabulary — single-sourced from sibling _broad_vocab
+# module so all three UC loaders measure the same vocab in the two-gate
+# assertion (gate 1 at module load on FINE_TO_BROAD values, gate 2 at
+# end-of-load on emitted obs['cell_type_broad']). Previously this
+# frozenset was copy-pasted into each loader; duplicate-by-copy is the
+# exact drift risk this single-sourcing fixes (the live F8 preview
+# "Perycites" typo could have been a value-side typo instead, and gate
+# 1 would have caught it in one loader but not the others if the
+# frozenset itself drifted). See DECISIONS (20).
+from _broad_vocab import _BROAD_VOCAB
 
 
 # Ribhi = ribosomal-high cross-lineage transcriptional state, not a lineage.

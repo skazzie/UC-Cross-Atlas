@@ -1840,6 +1840,149 @@ Files updated in this batch:
   update Trubetskoy N notes).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-06 (20): TAURUS Supp Table 1 dry-run + vocab single-sourced + three pre-stage bugs caught
+
+Two-pronged audit per PI directive: (i) "cheap and now" — fetch
+Supplementary Table 1 (70 KB xlsx) and validate `load_taurus.py`'s
+filter chain against the real cohort table before the 12.7 GB h5ad is
+staged; (ii) "two-minute check" — single-source `_BROAD_VOCAB` so the
+three UC loaders aren't measuring drift between identical-by-copy
+frozensets.
+
+### (a) Supp Table 1 fetched + parsed; UC cohort empirically locked.
+
+Source: Nature ESM URL for the paper
+(`https://static-content.springer.com/esm/art%3A10.1038%2Fs41590-024-01994-8/MediaObjects/41590_2024_1994_MOESM3_ESM.xlsx`,
+70 KB, 6 sheets). The relevant sheet is **Supp_Table_1B_SampleMetadataIBD**
+— 216 sample-level rows with columns: `sample_id`, `LibraryType`,
+`CellsLoaded`, **`Disease`**, `Disease_duration`, **`Patient`**,
+**`Site`**, **`Inflammation`** (categorical), **`Treatment`**
+(Pre/Post), `Age`, `Sex`, `Ethnicity`, `Match`, `Batch`,
+**`Inflammation_score`** (numeric), and ~20 CellRanger QC stats.
+
+Filter chain dry-run (sample-level, since cell-level inherits the
+sample's metadata per cell):
+
+| Stage | Samples kept | Notes |
+|---|---|---|
+| Total | 216 | 108 UC + 96 CD + 12 Healthy |
+| A: Disease == UC | 108 | drops CD + Healthy |
+| B: Colonic site | 103 | 5 UC Terminal_Ileum samples dropped |
+| C: Treatment == Pre | **52** | **22 distinct UC donors** |
+
+**Empirical hard invariants now in `load_taurus.py`:**
+
+- `EXPECTED_N_UC_DONORS_POST_FILTER = 22` (all UC patients contribute
+  at least one Pre colonic sample — no one is dropped).
+- `EXPECTED_N_UC_SAMPLES_POST_FILTER = 52` (soft tripwire — h5ad may
+  drop samples at QC).
+
+The Fig. 4c "17 UC patients with pretreatment samples" figure I
+estimated in (18)(b) was the paper's *additional* inflamed-baseline
+subset (after `inflammation_score > 6.5`), which (18)(a) deliberately
+pulls. Without that further filter, all 22 contribute. So (17)'s
+original `==22` was actually right; (18)(b)'s relaxation to
+`(15, 22)` was over-defensive. Tightened back to hard `==22`. Per-donor
+sample counts range 1–3; inflammation breakdown of the v1 subset:
+39 Inflamed + 13 Non_Inflamed (F1 governs whether to split downstream).
+
+### (b) Three pre-stage bugs caught in `load_taurus.py` — none would
+have surfaced without the Supp Table 1 audit.
+
+These are the value of "cheap and now" — would each have crashed or
+silently corrupted the first end-to-end run.
+
+1. **`_is_baseline` substring direction was wrong.** Original:
+   `return any(key in t for key in BASELINE_TIMEPOINT_KEYS)` — asks
+   "is any baseline key a substring of the value?" For TAURUS's
+   `"Pre"` (3 chars), no key in the list is a substring of `"pre"` →
+   returns False → **the loader would have dropped every Pre row,
+   producing zero UC cells**. Fixed: now `t in BASELINE_TIMEPOINT_KEYS`
+   (exact match against an explicit frozenset that includes the bare
+   token `"pre"`). Negative test confirms `_is_baseline("Pre") = True`,
+   `_is_baseline("Post") = False`.
+
+2. **`_TIMEPOINT_COL_CANDIDATES` was missing `"Treatment"`.** TAURUS's
+   actual column name is `"Treatment"` (Supp Table 1B), which my
+   candidate list didn't include. Auto-detect would have raised
+   `KeyError` on first run. Fixed; `"Treatment"` is now first in the
+   candidate list (TAURUS-confirmed names take precedence).
+
+3. **`_INFLAMMATION_COL_CANDIDATES` missed the capital-I
+   `"Inflammation_score"`.** Same shape as (2); added with TAURUS
+   precedence.
+
+Plus the donor-invariant relaxation (b above) — net 4 corrections
+without ever touching the 12.7 GB file.
+
+### (c) `_BROAD_VOCAB` single-sourced (the "two-minute check").
+
+`grep -n _BROAD_VOCAB` confirmed three copy-paste duplicates of the
+identical 15-string frozenset in `load_smillie.py`,
+`load_garrido_trigo.py`, `load_taurus.py`. Resolved by extracting to
+`code/02_atlas_prep/_broad_vocab.py` (sibling private module; same dir
+as `hgnc_remap.py` which the loaders already import sibling-style).
+Each loader now does `from _broad_vocab import _BROAD_VOCAB`;
+verified `id(load_X._BROAD_VOCAB)` is identical across all three.
+
+This is **not** the locked public `CANONICAL_BROAD` of
+`canonical_broad_DRAFT.md` — it's still underscore-prefixed and
+loader-only. When CANONICAL_BROAD locks (with CL subtree IDs,
+deprecation pass, and PI v2 sign-off per (13) + (18)(c)), this
+module's contents promote to `code/_shared/canonical_broad.py` and
+become a public import for `06_concordance`.
+
+PI's risk framing: "the heatmap measures vocabulary drift instead of
+biology if it isn't single-sourced." The (16) F8-preview defense
+(value-side typo catches via gate 1) only works if every loader's
+gate 1 is checking the same frozenset; with copy-paste duplicates, a
+value-side typo could pass in one loader and fail in another, or
+worse, an asymmetric vocab update could silently degrade the
+cross-atlas string intersection at step 06.
+
+### (d) What remains for next session — explicit critical-path read.
+
+PI's narrow path to the first 5-atlas × broad-tier concordance pass:
+
+1. **GWAS pipeline locally.** MAGMA binary + g1000_eur LD ref +
+   download de Lange + Yengo + Trubetskoy SCZ EUR (all four now
+   auto-fetchable per (19)) + munge → MAGMA → `make_scdrs_gs.py` →
+   `.gs` gene-set files. Out of scope tonight (context budget);
+   queued for next session. Liu's ancestry-LD policy decision blocks
+   only Liu — de Lange + Yengo + SCZ can munge first.
+
+2. **TAURUS expensive de-risk** (optional but high-value).
+   `download_refs.sh` can pull the 12.7 GB pooled file to laptop;
+   then a dry-run of `load_taurus.py` in backed mode surfaces the
+   actual `low`-tier label set to populate `LOW_TO_BROAD`. The
+   sample-level dry-run in (a) above already validates the filter
+   chain; the cell-level dry-run validates the cell-type hierarchy.
+
+3. **PI handoffs unchanged from previous turns.** v2 sign-off (gates
+   the eventual CANONICAL_BROAD lock); Muskaan's biology on the 3
+   unresolved CL IDs + MT/HSP/IER policy + F8 fine vocab.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/_broad_vocab.py` (new; single-source frozenset).
+- `code/02_atlas_prep/load_smillie.py`,
+  `code/02_atlas_prep/load_garrido_trigo.py`,
+  `code/02_atlas_prep/load_taurus.py` (each: replace local
+  `_BROAD_VOCAB` definition with `from _broad_vocab import _BROAD_VOCAB`).
+- `code/02_atlas_prep/load_taurus.py` (additional: fix `_is_baseline`
+  direction; tighten `EXPECTED_N_UC_DONORS_POST_FILTER = 22`; add
+  `EXPECTED_N_UC_SAMPLES_POST_FILTER = 52`; add `"Treatment"` and
+  `"Inflammation_score"` to candidate lists at TAURUS-confirmed
+  precedence; docstring update).
+- `DECISIONS.md` (this entry).
+
+The Supp Table 1 xlsx itself stays in `~/Downloads/` (not committed —
+Nature's copyright on supplementary materials is murky). The
+derived expected-cohort facts are encoded in the loader's constants;
+that's the audit-trail.
+
 
 
 

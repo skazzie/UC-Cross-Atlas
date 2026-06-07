@@ -117,33 +117,13 @@ HEALTH_TO_DISEASE = {
     "Non-inflamed": "ulcerative colitis",
 }
 
-# Canonical broad vocabulary — loader-local until CANONICAL_BROAD is
-# formally locked (see code/_shared/canonical_broad_DRAFT.md). The
-# loader runs two assertions against this set:
-#   (1) At module load: every value in FINE_TO_BROAD must be a member.
-#   (2) At end of load(): every distinct obs['cell_type_broad'] must be
-#       a member.
-# Smillie naturally populates 14 of the 15 (no granulocyte — its
-# taxonomy has no neutrophils/eosinophils); the canonical set still
-# includes granulocyte so the same frozenset can be promoted to
-# code/_shared/ unchanged when CANONICAL_BROAD locks.
-_BROAD_VOCAB: frozenset[str] = frozenset({
-    "B cell",
-    "NK/ILC",
-    "T cell",
-    "colonocyte",
-    "dendritic cell",
-    "endothelium",
-    "enteroendocrine/tuft",
-    "epithelial progenitor",
-    "fibroblast",
-    "goblet",
-    "granulocyte",
-    "mast cell",
-    "monocyte/macrophage",
-    "mural/glia",
-    "plasma cell",
-})
+# Canonical broad vocabulary — single-sourced from sibling _broad_vocab
+# module so all three UC loaders measure the same vocab in the two-gate
+# assertion. Previously this frozenset was copy-pasted into each loader;
+# duplicate-by-copy is the exact drift risk that would let
+# 06_concordance silently report vocab drift as biology. See DECISIONS
+# (20). Smillie naturally populates 14 of 15 (no granulocyte).
+from _broad_vocab import _BROAD_VOCAB
 
 # Fine -> broad roll-up into the SHARED 15-level vocab defined in
 # load_garrido_trigo.FINE_TO_BROAD / atlas_schemas.md. Smillie populates 14 of
