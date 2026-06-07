@@ -134,6 +134,37 @@ EXPECTED_N_UC_DONORS_POST_FILTER: int = 22
 # 52 = 39 Inflamed + 13 Non_Inflamed UC × colonic × Pre samples.
 EXPECTED_N_UC_SAMPLES_POST_FILTER: int = 52
 
+# Per-donor expected (region-set, sample-count) tuples from Supp Table
+# 1B (v3 has metadata corrections vs prior versions, so a mismatch here
+# is meaningful — see DECISIONS 21). Used in the donor-invariant
+# failure path to dump a structured diff rather than "expected 22, got
+# 21". Note: TAURUS Site values use underscores ("Ascending_Colon");
+# the loader passes obs[Site] through unchanged into the comparison.
+EXPECTED_UC_COHORT: dict[str, frozenset[str]] = {
+    "UC1":  frozenset({"Ascending_Colon", "Rectum"}),
+    "UC2":  frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC3":  frozenset({"Ascending_Colon", "Descending_Colon", "Rectum"}),
+    "UC4":  frozenset({"Ascending_Colon", "Descending_Colon"}),
+    "UC5":  frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC6":  frozenset({"Rectum", "Sigmoid"}),
+    "UC7":  frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC8":  frozenset({"Rectum", "Sigmoid"}),
+    "UC9":  frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC10": frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC11": frozenset({"Ascending_Colon", "Rectum"}),
+    "UC12": frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC13": frozenset({"Descending_Colon", "Rectum", "Sigmoid"}),
+    "UC14": frozenset({"Rectum", "Sigmoid"}),
+    "UC15": frozenset({"Descending_Colon", "Rectum"}),
+    "UC16": frozenset({"Ascending_Colon", "Descending_Colon"}),
+    "UC17": frozenset({"Descending_Colon", "Rectum"}),
+    "UC18": frozenset({"Rectum"}),
+    "UC19": frozenset({"Descending_Colon", "Rectum"}),
+    "UC20": frozenset({"Descending_Colon", "Rectum"}),
+    "UC21": frozenset({"Descending_Colon", "Rectum"}),
+    "UC22": frozenset({"Ascending_Colon", "Descending_Colon", "Rectum"}),
+}
+
 # Inflammation breakdown of the v1 cohort (informational; F1 governs
 # whether the subset gets further split before concordance):
 #   n(inflammation_score > 6.5)  ≈ 31
@@ -493,13 +524,53 @@ def load(
             f"Per-donor cell counts (top 30): {breakdown}."
         )
     if n_uc_donors != EXPECTED_N_UC_DONORS_POST_FILTER:
+        # Compute per-donor, per-region diff against Supp Table 1B so the
+        # failure points at the actual drift, not just the donor-count
+        # delta. v3 of the Zenodo deposit exists because of a metadata
+        # fix; an obs-vs-Supp-Table-1B disagreement is meaningful, and we
+        # want "donor X missing from region Y", not "expected 22, got 21".
+        obs_donors = set(adata_sub.obs[dcol].astype(str).unique())
+        exp_donors = set(EXPECTED_UC_COHORT)
+        missing_from_obs = sorted(exp_donors - obs_donors)
+        unexpected_in_obs = sorted(obs_donors - exp_donors)
+        # Per-donor region diff (only for donors that exist on both sides)
+        obs_by_donor_region = (
+            adata_sub.obs[[dcol, rcol]].astype(str)
+            .drop_duplicates()
+            .groupby(dcol)[rcol]
+            .agg(lambda s: frozenset(s.dropna()))
+            .to_dict()
+        )
+        region_drifts = []
+        for d in sorted(exp_donors & obs_donors):
+            exp_r = EXPECTED_UC_COHORT[d]
+            obs_r = obs_by_donor_region.get(d, frozenset())
+            if exp_r != obs_r:
+                missing_r = sorted(exp_r - obs_r)
+                extra_r = sorted(obs_r - exp_r)
+                region_drifts.append(
+                    f"    {d}: expected {sorted(exp_r)}; observed "
+                    f"{sorted(obs_r)}; missing {missing_r}; extra {extra_r}"
+                )
+        region_drift_block = (
+            "\n".join(region_drifts) if region_drifts
+            else "    (none — observed regions match Supp Table 1B for "
+                 "donors present on both sides)"
+        )
         raise ValueError(
-            f"TAURUS loader: UC donor count {n_uc_donors} != expected "
-            f"{EXPECTED_N_UC_DONORS_POST_FILTER} (Supp Table 1B, "
-            f"DECISIONS 20). The Supp Table is the empirical ground "
-            f"truth for the v1 subset; a mismatch means metadata drift "
-            f"in the h5ad obs vs the paper, OR a filter is wrong. "
-            f"Per-donor cell counts (top 30): {breakdown}."
+            f"TAURUS loader: UC cohort mismatch vs Supp Table 1B "
+            f"(DECISIONS 20 / 21).\n"
+            f"  expected donors: {EXPECTED_N_UC_DONORS_POST_FILTER}, "
+            f"observed: {n_uc_donors}\n"
+            f"  missing from observed: {missing_from_obs}\n"
+            f"  unexpected in observed: {unexpected_in_obs}\n"
+            f"  per-donor region drifts:\n{region_drift_block}\n"
+            f"  per-donor cell counts (top 30): {breakdown}\n"
+            f"v3 of the Zenodo deposit exists *because* of a metadata "
+            f"fix vs earlier versions, so an obs-vs-Supp-Table-1B "
+            f"disagreement is signal, not noise. Either the h5ad's "
+            f"obs columns drifted from the published Supp Table, or "
+            f"the filter chain auto-detected a wrong column."
         )
     logger.info(
         "Donor invariant passed: %d UC donors (matches Supp Table 1B).",

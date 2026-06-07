@@ -1983,7 +1983,100 @@ Nature's copyright on supplementary materials is murky). The
 derived expected-cohort facts are encoded in the loader's constants;
 that's the audit-trail.
 
+---
 
+## CORRECTION 2026-06-06 (21): Donor-mismatch diff dump + Trubetskoy PGC3 fact-check + sequencing nudge
 
+Three small but load-bearing follow-ups to (20).
 
+### (a) Donor-invariant failure now dumps a structured per-donor/per-region diff.
+
+PI flagged that the bare `expected 22, got 21` failure message
+wouldn't help triage when Zenodo v3 of TAURUS exists precisely
+*because* of a metadata fix vs prior versions — a mismatch is signal,
+not noise, and the failure message should point at the actual drift.
+
+Resolution:
+
+- New constant `EXPECTED_UC_COHORT` in `load_taurus.py`: dict mapping
+  each of the 22 UC donor IDs to a frozenset of expected colonic
+  regions, derived directly from Supp Table 1B's UC × colonic × Pre
+  rows (the same dry-run that produced the 22-donor / 52-sample lock
+  in (20)). Self-consistency check: sum of region-set cardinalities
+  across the 22 donors = 52 = `EXPECTED_N_UC_SAMPLES_POST_FILTER`.
+- Donor-mismatch failure path now computes and dumps:
+  - `missing_from_observed`: donors in Supp Table 1B but not in the
+    h5ad subset.
+  - `unexpected_in_observed`: donors in the h5ad subset but not in
+    Supp Table 1B (would signal an upstream metadata reassignment).
+  - **`per-donor region drifts`**: for each donor present on both
+    sides, the symmetric difference of region sets (`missing` and
+    `extra` regions per donor).
+  - Per-donor cell counts (top 30) as before.
+
+So a v3-vs-v4 metadata fix where, say, UC18's only sample gets
+re-tagged to a different region now surfaces as `UC18: expected
+{Rectum}; observed {Sigmoid}; missing [Rectum]; extra [Sigmoid]` —
+the triage call, not the donor-count delta.
+
+### (b) Trubetskoy fact-check: confirmed PGC3 SCZ, NOT PGC2.
+
+PI flagged that the (19) figshare reversal needs verification — that
+the file on figshare DOI 10.6084/m9.figshare.19426775 is actually
+Trubetskoy 2022 PGC3, not an older PGC2 release. Low stakes (negative
+control), but don't munge the wrong study.
+
+The VCF meta-header captured in (19) settles it. Verbatim:
+
+- ``##shortName="PGC3-SCZ"`` ← **PGC3**, not PGC2.
+- ``##preparedBy="VassilyTrubetskoy"`` ← first author of the 2022
+  Nature paper.
+- ``##DOI=<ID=BIORXIV,REF="https://doi.org/10.1101/2020.09.12.20192922">``
+  ← the bioRxiv preprint of Trubetskoy 2022 (the v2 preprint posted
+  in 2020 that became the Nature paper in 2022).
+- ``##nCase="52017"`` + ``##nTrio="1369"`` → cohort-level 53,386 EUR
+  cases. Trubetskoy 2022 reports 53,386 EUR cases (52,017 + 1,369
+  trios). **Exact match**.
+- ``##nControl="75889"``. Trubetskoy 2022 reports 77,258 EUR controls
+  (75,889 + 1,369 trios contribute as controls in the PGC trio
+  encoding). Matches.
+- ``##methodsParagraph`` reproduces verbatim from the published
+  Nature paper Abstract / Methods (Trubetskoy 2022 Nat 604:502).
+
+Counterfactual sanity-check: PGC2 (Schizophrenia Working Group 2014,
+Nat 511:421) had 36,989 EUR cases and 113,075 EUR controls. The
+numbers don't match this file at all, and the `##shortName` would be
+"SCZ2" or similar, not "PGC3-SCZ". So this is definitively the 2022
+release.
+
+Confirmed pin remains: figshare DOI ``10.6084/m9.figshare.19426775.v7``,
+file ``PGC3_SCZ_wave3.european.autosome.public.v3.vcf.tsv.gz``, md5
+``6ebe2376f5cda972d37efa0f214c4df0``.
+
+### (c) Sequencing nudge for next session.
+
+PI flagged that the TAURUS-expensive dry-run (12.7 GB pull + cell-level
+loader validation) is **now largely redundant** thanks to the (20)
+Supp Table 1 sample-level dry-run + gate 2's loud-failure-on-first-run
+behavior for the `low`-tier labels. So next session's ordering is:
+
+1. **GWAS pipeline locally** (laptop-side, half the heatmap, fully
+   independent of HB): pull MAGMA + g1000_eur + de Lange + Yengo +
+   Trubetskoy SCZ EUR (all four auto-fetchable now per (19) and the
+   downstream-handling table in `scripts/download_refs.sh`). Munge
+   each → MAGMA → `make_scdrs_gs.py` → `.gs` gene-set files. Liu
+   waits on the ancestry-LD method decision.
+2. **HB-side TAURUS run** (when HB access is back): stage the
+   pre-validated loader; gate 2 surfaces the real `low`-tier label
+   set on first failure; populate `LOW_TO_BROAD` from that;
+   re-run; done.
+3. **Skip** the local 12.7 GB pull unless HB access slips badly —
+   the validation it would add is now redundant given (20)+(21).
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_taurus.py` (`EXPECTED_UC_COHORT` constant
+  added; donor-mismatch failure rewritten to dump the per-donor /
+  per-region diff).
+- `DECISIONS.md` (this entry).
 
