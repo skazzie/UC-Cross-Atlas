@@ -125,8 +125,8 @@ Per-step instructions live in each `code/<step>/README.md`.
 See PLAN.md §"Reading list" or PDF Part 6. Must-read in M1:
 
 - Watanabe 2019, Skene 2018, Bryois 2020, Zhang 2022 (scDRS),
-  Lai 2025 (seismicGWAS), Lakkis 2024, Smillie 2019, de Lange 2017,
-  Liu 2023.
+  Lai 2025 (seismicGWAS), Smillie 2019, de Lange 2017, Liu 2023.
+  (Lakkis 2024 struck — see DECISIONS 23(b).)
 
 ## Contact
 

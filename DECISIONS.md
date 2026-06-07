@@ -2298,6 +2298,67 @@ side. Remaining gate is the loader-runs-clean check on a compute node
 TAURUS dependency for the first figure since CD/HC arms are dropped
 and the broad axis can be computed pairwise).
 
+---
+
+## CORRECTION 2026-06-07 (23): Li-2025 N_eff lock + bibliography audit
+
+Two small but record-worthy items from the rev2 execution to-do PDF:
+the cross-GWAS power-axis lock that the (14) cross-GWAS effective-N
+range left open, and the bibliography strikes that have been verbal
+PI flags for weeks but never landed in the audit trail.
+
+### (a) Li-2025 confound handling — use N_eff on the power axis.
+
+The (14) effective-N table established the cross-GWAS magnitude
+range (de Lange 46k / Liu 376k / Yengo 1.6M, three orders of
+magnitude). The to-do PDF locks the power-axis treatment of that
+range: **use N_eff, not total N**, when reasoning about per-GWAS
+power on the concordance heatmap. Specifically:
+
+- **de Lange UC** GCST004133: total N = 45,975; **N_eff ≈ 36,168**
+  (Willer et al. effective sample size for a case-control study,
+  applied to the published 12,366 cases / 33,609 controls split).
+- **Liu UC** GCST90446794: total N = 375,508; **N_eff ≈ 87,242**
+  (trans-ancestry; case count 23,252 across EAS + EUR arms).
+- **Cross-GWAS N_eff ratio:** 87,242 / 36,168 ≈ **2.4×**.
+
+Controls are excluded from the power axis — they contribute to the
+test statistic's null but not to the case-count-bound effective
+power, so per Li 2025's framing of single-cell-GWAS sample-size
+sensitivity, N_eff is the right axis label. Total N is appropriate
+only for variance-scaling, which is upstream of the concordance
+metric.
+
+The 2.4× ratio is small enough that the cross-GWAS concordance
+*should* survive a power-correction sensitivity panel — but it's
+not zero, and the magnitude is what justifies including the Li-2025
+sensitivity in Phase 9 rather than pre-emptively in the headline.
+
+### (b) Bibliography audit — strikes.
+
+PI flagged three references in the v1 plan/READMEs as stale or
+incorrect during the rev2 to-do prep. Audit findings:
+
+- **Lakkis 2024** — struck. Cited in `README.md` "Reading list"
+  bullet; no further references in PLAN.md or docs/. Removed from
+  the README in this batch.
+- **Devlin/Zhao 2023** — struck. Cited in `DECISIONS.md` line 52,
+  inside the original PI brief at the top of the file ("Fallbacks:
+  Garrido-Trigo 2023, Boland 2020, Devlin/Zhao 2023"). That line is
+  a historical record of the project's locked-core decisions and
+  is NOT overwritten here; the strike is logged in this entry
+  instead. Forward references should not cite Devlin/Zhao 2023.
+- **GSE229072** — already correctly handled in correction (15)
+  (record-of-record: "GSE229072 is not Mennillo"). The Mennillo
+  arm itself was dropped in correction (16) (TAURUS swap). No
+  additional strike needed; the negative-finding record stands.
+
+Files updated in this batch:
+
+- `README.md` (Lakkis 2024 removed from Reading list; pointer added
+  to this DECISIONS entry).
+- `DECISIONS.md` (this entry).
+
 
 
 
