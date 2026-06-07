@@ -20,7 +20,7 @@ TOP_K_FINE: tuple[int, ...] = (5, 10, 20)
 SCDRS_N_CTRL: int = 1000
 SEISMIC_N_PERMUTATIONS: int = 1000
 
-UC_ATLASES: tuple[str, ...] = ("smillie", "garrido_trigo", "mennillo")
+UC_ATLASES: tuple[str, ...] = ("smillie", "garrido_trigo", "taurus")
 UC_GWAS: tuple[str, ...] = ("delange", "liu")
 METHODS: tuple[str, ...] = ("scdrs", "seismic")
 TIERS: tuple[str, ...] = ("broad", "fine")

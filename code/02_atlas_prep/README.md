@@ -12,9 +12,13 @@ analysis.
 - **Garrido-Trigo 2023 UC subset** (GEO GSE214695 / CELLxGENE) — 6 healthy
   + 6 active UC. (Previously listed as "Kong 2023" — see DECISIONS.md
   correction 2026-05-20 (2/7).)
-- **Mennillo 2024** (GEO accession to confirm in M1) — anti-integrin
-  therapy time course; **subset to pre-treatment baseline samples only**.
-  Verify ≥8 donors after subsetting; if fewer, swap to Garrido-Trigo 2023.
+- **TAURUS-IBD** (Thomas et al. 2024, Zenodo
+  `10.5281/zenodo.13768607` / `10.5281/zenodo.14007626` — pin version
+  before download) — longitudinal anti-TNF single-cell atlas (UC + CD).
+  Subset to **UC donors only** and a **single time-point per donor**
+  (pre-treatment baseline preferred). Replaces the previously-planned
+  Mennillo 2024 (anti-integrin) per DECISIONS 16. Verify ≥8 UC donors
+  after subsetting.
 - **HCA Gut Cell Atlas** (cellxgene, Elmentaite 2021) — large-intestine
   subset only. M1 must verify zero donor overlap with the UC trio.
 - **Pan-GI** (cellxgene, Oliver 2024) — Extended+ slice (1.6M cells),
@@ -103,7 +107,7 @@ locked policy.
 | `load_pangi.py` | Pan-GI Extended+ (broad comparator) | Production | UC + IBD diseases x colon organs x non-organ-donor |
 | `load_hca_gut.py` | HCA Gut / Elmentaite 2021 (broad reference) | Production | `Age_group in {Adult, Adult_MLN}` x colon tissues |
 | `load_smillie.py` | Smillie 2019 (UC core) | Loader complete; first compute-node run pending | 30 donors (12 HC + 18 UC paired); `Health` 3-state preserved (`obs['health']`); harmonized 2-state `disease` via `HEALTH_TO_DISEASE`; `log1p(CP10k)` applied on load (raw in `layers['counts']`); 51 fine → 14 broad. See DECISIONS correction 10. |
-| `load_mennillo.py` | Mennillo 2024 (UC core) | Skeleton | GEO download deferred to next session |
+| `load_taurus.py` | TAURUS-IBD (Thomas 2024) (UC core) | Skeleton | Zenodo download deferred; replaces Mennillo per DECISIONS (16); subset to UC + pre-treatment baseline on load |
 
 Each production loader exposes a `load(h5ad_path, apply_v1_filter=True,
 raw_count_mode=False)` function returning a standardized AnnData with

@@ -12,7 +12,7 @@ _Last updated: June 6, 2026._
 Smillie's `Health` field has **three** states: Healthy / Non-inflamed / Inflamed — UC
 patients contribute both inflamed and non-inflamed biopsies. Decide whether the UC group
 is inflamed-only, non-inflamed-only, or pooled — and make it **consistent across all
-atlases** (confirm what Garrido's and Mennillo's "UC" tissue actually is). A mismatch
+atlases** (confirm what Garrido's and TAURUS's "UC" tissue actually is — TAURUS is anti-TNF longitudinal, so the time-point chosen sets the inflamed/non-inflamed status). A mismatch
 (e.g. Garrido = inflamed biopsies, Smillie = pooled) would confound concordance as
 biology, not method.
 - **Smillie structure (confirmed):** 12 healthy controls + 18 UC patients, paired —
@@ -71,7 +71,7 @@ place; they are not biology-locked.
 labels (`set(scores_a) & set(scores_b)`). Broad tier works because
 CANONICAL_BROAD forces identical strings; fine tier has no equivalent — loaders
 emit each atlas's *native* fine labels (Smillie 51 `Cluster`, Garrido
-91-collapsed, Mennillo TBD) and no canonical-fine vocab/crosswalk exists. Native
+91-collapsed, TAURUS TBD) and no canonical-fine vocab/crosswalk exists. Native
 labels won't string-match across studies (even "Inflammatory Fibroblasts" vs
 "Inflammatory fibroblasts"), so the fine intersection is near-empty and the
 README's k=20 fine-tier Jaccard is undeliverable as wired.
@@ -79,7 +79,7 @@ Need: a fine-harmonization layer (canonical fine vocab, or per-atlas crosswalk
 to shared names). Achievable shared fine set = subtypes biologically alignable
 AND ≥ MIN_CELLS_PER_TYPE (50) in all three atlases ≈ a few dozen well-defined
 types; study-specific inflammatory states excluded/caveated. Cannot be confirmed
-until the Mennillo loader exists (3-way intersection bounded by worst atlas).
+until the TAURUS loader exists (3-way intersection bounded by worst atlas).
 - **Bites at:** fine-tier concordance (step 06); gates the fine-tier novelty
   axis (the gap Li et al. 2025 flag as future work). Scope before banking fine
   tier as a headline result.

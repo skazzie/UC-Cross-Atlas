@@ -1235,6 +1235,196 @@ remains Smillie + Garrido-Trigo with Mennillo deferred to M2.
 
 No files updated by this correction (negative-finding record only).
 
+---
+
+## CORRECTION 2026-06-06 (16): Post-audit fixes — TAURUS swap, effective N math, Liu/CL verification
+
+The (13)–(15) work this session was audited; five real issues caught
+that need correcting before they propagate further.
+
+### (a) Mennillo dropped; TAURUS-IBD is the third UC atlas.
+
+Mennillo 2024 (anti-integrin, Nat Commun 15:1493) was the planned
+Atlas 3 through correction (15). It is **dropped from v1.** The third
+UC core atlas is now **TAURUS-IBD** — Thomas, Dendrou, Agarwal
+(Oxford, 2024), "A longitudinal single-cell atlas of anti-tumour
+necrosis factor treatment in inflammatory bowel disease".
+
+- **Source**: Zenodo. The swap directive cited DOI
+  `10.5281/zenodo.13768607`; the DOI that resolves on Zenodo as of
+  2026-06-06 is `10.5281/zenodo.14007626` (presumably a different
+  versioned record of the same dataset). **Both DOIs flagged in the
+  loader docstring; canonical version must be pinned before download.**
+- **License**: CC-BY-4.0, public, no registration.
+- **Files**: `TAURUS_raw_counts_annotated_final.h5ad` (12.7 GB) plus
+  per-lineage h5ads (epithelial, CD4/CD8 T, B, plasma, myeloid, ILC,
+  fibroblasts, vascular). Raw BAM/CellRanger at GEO `GSE282122`.
+  Total ~27.9 GB.
+- **Scope alignment**: anti-TNF longitudinal IBD = UC + CD donors.
+  Loader must subset to UC donors only AND a single time-point per
+  donor (pre-treatment baseline preferred), mirroring the discipline
+  the Mennillo loader was going to apply.
+
+The Mennillo accession hunt from (15) ("next-session browser fetch of
+Nat Comms data availability") is **dead work** and is killed by this
+correction. The negative finding in (15) — GSE229072 ≠ Mennillo — is
+preserved as a historical record but no longer drives any TODO.
+
+Files updated:
+
+- `code/02_atlas_prep/load_mennillo.py` — **deleted**.
+- `code/02_atlas_prep/load_taurus.py` — **new**; `NotImplementedError`
+  skeleton with both Zenodo DOIs in the docstring and the UC + single-
+  time-point subset requirement documented.
+- `code/02_atlas_prep/atlas_schemas.md` — `## mennillo` section
+  replaced with `## taurus` (DEFERRED placeholder with the captured
+  Zenodo metadata; full schema captured on download).
+- `code/02_atlas_prep/README.md` — atlas list bullet + loader-status
+  table row updated; v1 trio is now Smillie + Garrido-Trigo + TAURUS.
+- `code/_shared/constants.py` — `UC_ATLASES` tuple: `"mennillo"` →
+  `"taurus"`. (Downstream slurm scripts and module READMEs reference
+  this constant via env var or import; cascade is contained.)
+- `scripts/download_refs.sh` — Mennillo manual section → TAURUS Zenodo.
+- `OPEN_FLAGS.md` — F1 (UC tissue definition) and F8 (fine-tier
+  harmonization) updated to reference TAURUS instead of Mennillo.
+
+Other Mennillo mentions in slurm scripts, individual-module READMEs,
+top-level README.md, PLAN.md, and historical DECISIONS entries are
+left in place — the slurm/module references will pick up the new
+atlas name via `UC_ATLASES`, and the historical entries (1/7)–(15)
+describe Mennillo as it was the planned third atlas at the time, which
+remains an accurate historical record. The README/PLAN top-level
+references should be reconciled by Muskaan in a manuscript-side pass
+(out of scope for this correction).
+
+### (b) "Effective N" was mislabeled in (14); recomputed.
+
+(14) cited "46k / 376k / 1.6M effective N range across de Lange / Liu
+/ Yengo, three orders of magnitude". **Wrong in three ways:**
+
+1. **Those are totals, not effective Ns.** For case-control,
+   `N_eff = 4 / (1/n_case + 1/n_ctrl)`.
+2. **Magnitude wrong.** 46k → 1.6M is ~35× ≈ 1.5 orders of magnitude,
+   not three.
+3. **Frame wrong.** Yengo (quantitative) and Trubetskoy (separate
+   trait) are positive/negative controls — they don't belong on a
+   "cross-GWAS power confound" axis. The N confound that matters is
+   **de Lange vs Liu** (both UC).
+
+**Recomputed effective N for the two UC GWAS:**
+
+| GWAS | Cases | Controls | Total | **N_eff** |
+|---|---|---|---|---|
+| de Lange UC (GCST004133) | 12,366 | 33,609 | 45,975 | **36,168** |
+| Liu UC (GCST90446794), multi-ancestry | 6,862 EAS + 16,390 EUR = 23,252 | 15,456 EAS + 336,800 EUR = 352,256 | 375,508 | **87,242** |
+
+**The relevant cross-GWAS power ratio is 87k / 36k ≈ 2.4× ≈ half an
+order of magnitude.** Material (Liu has more power) but not three
+orders. Also: de Lange's case:control ratio is 1:2.7, Liu's is 1:15.1
+— Liu is far more control-skewed, which inflates total N relative to
+effective N. Methods that scale with `N_eff` inherit the 2.4× gap;
+methods that scale with total N see an 8.2× gap. **Both are
+deceptive** when used naively to compare power; effective N is the
+right axis.
+
+Yengo (quantitative, GCST90245992): `N_eff ≈ N = 1,597,374`. **Stays
+out of the cross-GWAS confound argument** since it's the positive
+control for an unrelated trait. Same for Trubetskoy SCZ (negative
+control).
+
+This recomputation is what feeds the Li-2025 sample-size handling.
+Nothing was "settled" by the totals quoted in (14); the corrected
+N_eff numbers above are the substrate.
+
+### (c) Liu UC accession verified the same way de Lange was.
+
+Re-queried the GWAS Catalog REST API for GCST90446794:
+
+- `reportedTrait`: "Ulcerative colitis" ✓ (NOT IBD-combined — the
+  same trap that bit de Lange in (14) does not bite Liu).
+- `fullPvalueSet`: true.
+- `initialSampleSize`: "6,862 East Asian ancestry cases, 15,456 East
+  Asian ancestry controls, 16,390 European ancestry cases, 336,800
+  European ancestry controls".
+- `publicationInfo.firstAuthor`: "Liu Z", PMID 37156999, Nat Genet
+  2023-05-08.
+
+**No European-only Liu UC arm exists** in the GWAS Catalog deposits
+for PMID 37156999. The two UC accessions are:
+
+- GCST90446794: multi-ancestry (EAS + EUR) — what we picked.
+- GCST90446795: EAS-only.
+
+**Ancestry-LD mismatch flag.** Liu UC is intrinsically multi-ancestry;
+the EAS fraction (~5.9% of total, 22,318/375,508) is fixed. If MAGMA
+runs against `g1000_eur` (the EUR LD reference Saisohan already
+staged), the LD model will be wrong for the EAS variants. Three
+options to handle, none free:
+
+1. Use the multi-ancestry sumstats with a matched multi-ancestry LD
+   reference (changes the MAGMA bfile across atlases, breaking
+   uniformity).
+2. Use a EUR-restricted variant set from the multi-ancestry sumstats
+   (lose ~5.9% of effective N but keep EUR LD model honest).
+3. Use de Lange UC as the only EUR-LD-honest UC GWAS; treat Liu UC as
+   sensitivity / multi-ancestry-LD only.
+
+**Deferred to method-side decision** (needs the MAGMA pipeline
+running); not a blocker for the atlas side. Flagged in DECISIONS for
+the (eventual) sample-size confound discussion.
+
+### (d) CL OWL deep-dive — none of the 6 flagged IDs are deprecated.
+
+Re-parsed the 2026-03-26 OWL specifically for `owl:deprecated`,
+`IAO_0100001` (replaced_by), and `oboInOwl:consider` on the 6 IDs
+flagged in (13). **None of the 6 carry any of those annotations.**
+
+- All 6 are **live terms** in CL 2026-03-26.
+- The 3 "label drift" cases (CL:1000347, CL:0002204, CL:0002138) are
+  IDs that *correctly* point at the concepts we want — my draft just
+  used outdated/wrong labels for them. Concept-side: no change needed.
+  Label-side: `canonical_broad_DRAFT.md` rows updated inline in (13)
+  to the pinned 2026-03-26 labels (`colonocyte`, `tuft cell`,
+  `endothelial cell of lymphatic vessel`).
+- The 3 "WRONG ID" cases (CL:1000280, CL:0009039, CL:0002073) are IDs
+  that point at *unrelated* live concepts in 2026-03-26 (smooth muscle
+  cell of colon; colon goblet cell; transitional myocyte respectively).
+  **No `replaced_by` upgrade path** — these are plain draft authoring
+  mistakes, not ontology obsoletions. The correct CL IDs for the
+  intended concepts (intestinal stem cell beyond CL:0002250; colon
+  epithelial progenitor; enteric glial cell) need actual ontology
+  lookup, **not** a follow-the-pointer remap. Muskaan biology call.
+- The label-drift fixes from (13) should still be sanity-checked by
+  Muskaan against the pinned 2026-03-26 release; the LLM-edited
+  labels could in principle have introduced their own drift. The
+  pinned TSV at `data/reference/cl_terms_pinned.tsv` is the
+  authoritative reference for that check.
+
+### (e) Yengo subset confirmed.
+
+GCST90245992 confirmed via REST: European ancestry, 1,597,374
+individuals, `fullPvalueSet=true`, Yengo 2022 Nature. The 4M / 5.4M
+figures in press releases reference the multi-ancestry discovery set
+(GCST90245843, no full p-values). The 1.6M EUR-with-full-pvalues
+subset is the right pick for our MAGMA + 1000G-EUR pipeline. **No
+change to the (14) pick.**
+
+### Summary of operational impact
+
+- **Liu cross-GWAS handling**: needs ancestry-LD policy decision when
+  MAGMA pipeline runs. Three options listed in (c) above; not blocking
+  the atlas side. Deferred to method-side correction.
+- **TAURUS DOI version**: pin needed before download. Two DOIs
+  documented in the loader skeleton + atlas_schemas; resolve in the
+  next session.
+- **CL canonical IDs**: 3 unresolved IDs in the canonical broad draft.
+  Real biology lookup; Muskaan call. Until resolved, the draft cannot
+  promote to a locked CANONICAL_BROAD — which is exactly the discipline
+  the DRAFT was designed for.
+- **Effective N (UC GWAS)**: 36k (de Lange) vs 87k (Liu) — that's the
+  number for the Li-2025 power discussion, not the totals.
+
+
 
 
 

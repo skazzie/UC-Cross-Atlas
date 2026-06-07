@@ -377,12 +377,28 @@ flagged inline; M2 marker-QC moves them into DECISIONS once resolved.
 
 ---
 
-## mennillo (DEFERRED to next session)
+## taurus (DEFERRED — replaces Mennillo per DECISIONS 16)
 
-- **Source**: GEO GSE229072 (verify accession)
-- **Paper**: Mennillo 2024, Nat Commun 15:1493
-- **Expected n_cells**: ~50-100k (verify on download)
-- **Schema**: TBD (capture after download)
+- **Source**: Zenodo (Thomas, Dendrou, Agarwal — Oxford, 2024).
+  - DOI cited in swap directive: `10.5281/zenodo.13768607`
+  - DOI resolved 2026-06-06:     `10.5281/zenodo.14007626`
+  - Pin which version is canonical before loader implementation.
+- **Paper**: "A longitudinal single-cell atlas of anti-tumour necrosis
+  factor treatment in inflammatory bowel disease", 2024.
+- **Files**: `TAURUS_raw_counts_annotated_final.h5ad` (12.7 GB) +
+  per-lineage h5ads. Raw BAM/CellRanger at GEO `GSE282122`. Total
+  ~27.9 GB. CC-BY-4.0, public, no registration needed.
+- **Scope**: anti-TNF longitudinal IBD (UC + CD). The v1 loader must
+  subset to **UC donors only** and to a **single time-point per donor**
+  (pre-treatment baseline preferred).
+- **Expected n_cells (UC subset)**: TBD — capture on download.
+- **Schema**: TBD — capture on download.
+- **Counts**: filename suggests raw integer counts; loader applies
+  `log1p(CP10k)` on load (5/7), preserves raw in `layers['counts']`.
 
-Placeholder loader (`load_mennillo.py`) created with TODO markers; will be
-filled in after GEO download.
+Placeholder loader (`load_taurus.py`) created with TODO markers; will
+be implemented after Zenodo download and schema capture (same
+discipline as Smillie SCP259 / Garrido RAW.tar).
+
+**Note**: Mennillo 2024 (anti-integrin) was the prior planned third
+atlas. Dropped per DECISIONS 16 (see entry for rationale).

@@ -142,9 +142,12 @@ cat <<EOF
      Save to:
        \$UCC_DATA/atlases/garrido_trigo.h5ad
 
-  3. Mennillo 2024 — verify GEO accession at M1; subset to
-     pre-treatment baseline samples per DECISIONS.md before saving:
-       \$UCC_DATA/atlases/mennillo.h5ad
+  3. TAURUS-IBD (Thomas 2024) — Zenodo deposit; replaces the previously
+     planned Mennillo 2024 per DECISIONS correction (16). Pin Zenodo
+     version (10.5281/zenodo.13768607 vs 10.5281/zenodo.14007626) before
+     download. CC-BY-4.0, public, ~27.9 GB total. Subset to UC donors
+     only + a single time-point per donor on load. Save as:
+       \$UCC_DATA/atlases/taurus.h5ad
 
   4. HCA Gut Cell Atlas (Elmentaite 2021) —
      https://cellxgene.cziscience.com/  (search "HCA gut")
