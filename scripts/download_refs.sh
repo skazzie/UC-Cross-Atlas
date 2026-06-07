@@ -123,6 +123,31 @@ _fetch \
     "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90245001-GCST90246000/GCST90245992/GCST90245992_buildGRCh37.tsv" \
     gwas/height_yengo_GCST90245992.tsv
 
+# ---- 5d. Trubetskoy 2022 SCZ EUR (PGC3 wave3) ---------------------------
+# Negative-control GWAS. EUR-ancestry subset, PGC3 wave 3.
+# Hosted on **public figshare** (DOI 10.6084/m9.figshare.19426775.v7,
+# CC BY 4.0, is_public=true, is_embargoed=false). No registration
+# required — the "PGC Terms and Conditions" mentioned on
+# https://pgc.unc.edu/for-researchers/download-results/ are a
+# Fort Lauderdale honor-code researcher pledge, not an access gate.
+# The publication embargo cleared when Trubetskoy 2022 (Nature 604:502)
+# landed; free for genome-wide analyses now. See DECISIONS (19) for the
+# (18)(d) retraction.
+#
+# File: PGC3_SCZ_wave3.european.autosome.public.v3.vcf.tsv.gz, 240 MB,
+# md5 6ebe2376f5cda972d37efa0f214c4df0.
+#
+# Format: PGC sumstats VCF v1.0 (PGC-internal extension of VCF —
+# non-standard; munge step needs to extract the 14 columns from rows
+# rather than treat as standard GWAS-Catalog SSF). 14 columns captured
+# 2026-06-06: chr, rsid, pos, A1, A2, frq_A, frq_U, info, beta, se, p,
+# n_case_cohort (52017+1369), n_ctrl_cohort (75889+1369), n_eff_per_snp.
+# Build GRCh37. **HAS per-SNP N_eff** in the last column.
+
+_fetch \
+    "https://ndownloader.figshare.com/files/34517828" \
+    gwas/scz_trubetskoy_eur_PGC3_v3.vcf.tsv.gz
+
 # ---- 6. Manual-only items ------------------------------------------------
 
 cat <<EOF
@@ -162,30 +187,23 @@ cat <<EOF
   GWAS (Liu, de Lange, Yengo are now auto-fetched above; only SCZ is manual)
   --------------------------------------------------------------------------
 
-  6. Trubetskoy 2022 schizophrenia (negative control) — Nature 604:502.
-     ** HUMAN-IN-THE-LOOP DELAY — START REGISTRATION NOW. **
-     GWAS Catalog accession GCST90128471 exists, but full summary
-     statistics are NOT hosted there (fullPvalueSet = False). Download
-     from PGC instead:
-       https://www.med.unc.edu/pgc/download-results/
-     PGC registration is a multi-day human-driven approval step
-     (account + data-access form + manual review). Submit the request
-     now even though Hummingbird access is offline — the delay is the
-     same whether you submit today or in a week, but the wait clock
-     only starts after submission. The PGC3 SCZ file is the multi-
-     ancestry meta (53,386 EUR + 14,004 EAS + 6,152 AA + 1,234 Latino
-     cases). Save as:
-       \$UCC_DATA/gwas/scz_trubetskoy.tsv.gz
-     See DECISIONS corrections (14), (18)(d).
+  6. Trubetskoy 2022 SCZ is now auto-fetched above (5d). The previous
+     belief that PGC required multi-day registration was wrong — the
+     summary stats are public on figshare, no registration. See
+     DECISIONS (19).
 
 After every download, sanity-check column names with:
     zcat <file> | head -2
 
-Per-SNP N column status (DECISIONS 14):
+Per-SNP N column status (DECISIONS 14, 19):
   - Yengo height (GCST90245992):           HAS per-SNP 'n' column.
-  - de Lange UC (GCST004133):              NO per-SNP N; fixed = 45,975.
-  - Liu UC (GCST90446794):                 NO per-SNP N; fixed = 375,508.
-  - Trubetskoy SCZ (PGC):                  check on download.
+  - de Lange UC (GCST004133):              NO per-SNP N; fixed = 45,975
+                                           (N_eff ≈ 36,168 — DECISIONS 16).
+  - Liu UC (GCST90446794):                 NO per-SNP N; fixed = 375,508
+                                           (N_eff ≈ 87,242 — DECISIONS 16).
+  - Trubetskoy SCZ EUR (PGC3 figshare):    HAS per-SNP n_eff (last column).
+                                           Cohort: 53,386 cases (incl. trios)
+                                           + 77,258 controls; N_eff ≈ 123,000.
 
 Then proceed to:
     sbatch --export=GWAS=delange scripts/slurm/01_magma.slurm

@@ -77,8 +77,12 @@ sbatch -p $UCC_PARTITION --account=$UCC_ACCOUNT --mail-user=$UCC_EMAIL \
   use the paper's combined N, OR add `--col-n <colname>` to the
   prepare_gwas.py call if the file has per-SNP N (preferred per
   DECISIONS.md).
-- Trubetskoy 2022 SCZ sample size in `scripts/slurm/01_magma.slurm` —
-  defaults to 130,635 but verify against the paper.
+- Trubetskoy 2022 SCZ sample size: PGC3 wave3 EUR file has per-SNP
+  `n_eff` in the last VCF column (DECISIONS 19). Pass `--col-n n_eff`
+  to `prepare_gwas.py`. Cohort-level N (for sanity): 53,386 cases
+  (incl. trios) + 77,258 controls; N_eff ≈ 123,000. **Auto-fetched**
+  from figshare — no registration. The (18)(d) "human-in-the-loop
+  registration delay" framing was a misread; see DECISIONS 19.
 - TAURUS UC donor count after subset (DECISIONS 16) — expect 22 per
   Thomas 2024 Fig. 2b; used in `--array=0-21` for
   `donor_loo_array.slurm`. Verify on first run of `load_taurus.py`.
@@ -118,8 +122,9 @@ conda activate uc-cross-atlas
 ## What this scaffolding does NOT do
 
 - **Run anything for you.** You execute jobs; this is templating.
-- **Download datasets that require accounts.** Single Cell Portal, PGC,
-  cellxgene Discover all need you to log in interactively.
+- **Download datasets that require accounts.** Single Cell Portal and
+  cellxgene Discover need interactive login. (PGC SCZ does NOT — see
+  DECISIONS 19; auto-fetched in `download_refs.sh` step 5d.)
 - **Decide if results pass the M3 gate.** Test-retest pass thresholds
   (scDRS ρ ≥ 0.9; seismicGWAS ρ ≥ 0.999) are evaluated by you against
   the outputs.

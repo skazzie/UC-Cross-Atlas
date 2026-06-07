@@ -1749,6 +1749,97 @@ Files updated in this batch:
   emphasis).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-06 (19): PGC SCZ is publicly downloadable — (18)(d) retracted
+
+(18)(d) flagged PGC registration as a "multi-day human-in-the-loop"
+delay and asked for it to be started immediately. On attempting to
+start it, **the registration does not exist**. The summary statistics
+are on public figshare with `is_public=true`, `is_embargoed=false`,
+and a CC-BY-4.0 license; the figshare API returns 36 files with
+direct `ndownloader` URLs.
+
+The "PGC Terms and Conditions" referenced on
+`https://pgc.unc.edu/for-researchers/download-results/` are a Fort
+Lauderdale honor-code researcher pledge (don't re-identify
+participants, don't publish global analyses before the consortium
+manuscript publishes), **not** a registration gate. The publication
+embargo from the Fort Lauderdale clause cleared when Trubetskoy 2022
+landed in Nature 604:502 (April 2022) — free for genome-wide analyses
+including ours.
+
+**Schema captured** (PGC3 wave3 EUR file, range-fetched from
+figshare):
+
+- **Format**: `##fileFormat=PGCsumstatsVCFv1.0` — a PGC-internal
+  extension of VCF. Verbose `##` meta-header (acknowledgments,
+  contigs, terms of use, n_case=52017, n_control=75889, n_trio=1369);
+  data rows are 14 plain tab-separated columns:
+
+  | # | Column | Notes |
+  |---|---|---|
+  | 1 | `chr` | 1..22, X, Y, M |
+  | 2 | `rsid` | dbSNP id |
+  | 3 | `pos` | GRCh37 coordinate |
+  | 4 | `A1` | effect allele |
+  | 5 | `A2` | other allele |
+  | 6 | `frq_A` | allele freq in cases |
+  | 7 | `frq_U` | allele freq in controls |
+  | 8 | `info` | imputation quality |
+  | 9 | `beta` | log-OR |
+  | 10 | `se` | standard error |
+  | 11 | `p` | p-value |
+  | 12 | `n_case_cohort` | cohort-level (53,386 = 52,017 + 1,369 trios) |
+  | 13 | `n_ctrl_cohort` | cohort-level (77,258 = 75,889 + 1,369 trios) |
+  | 14 | `n_eff` | **per-SNP** effective sample size |
+
+- **HAS per-SNP `n_eff`** — column 14 varies by imputation
+  completeness; pass `--col-n n_eff` to `prepare_gwas.py` rather than
+  the cohort-level fixed N.
+- **Build**: GRCh37 (matches Yengo + de Lange; Liu is GRCh38).
+- **EUR cohort N_eff (cohort-level)**: `4 / (1/53,386 + 1/77,258) ≈
+  126,275`. Per-SNP values from column 14 will hover near this.
+  Bigger than Liu UC (87k) and de Lange UC (36k) — the SCZ negative
+  control is the most-powered of the four.
+- **md5 of pooled file**: `6ebe2376f5cda972d37efa0f214c4df0` (240 MB).
+- **Cited DOI**: `10.6084/m9.figshare.19426775.v7`.
+
+**Munge implication**. Because of the PGC-VCF format, the munge step
+(`prepare_gwas.py` or LDSC `munge_sumstats.py`) needs to skip the
+verbose `##` meta-header and treat the data rows as 14-column
+tab-separated. Standard GWAS-Catalog-SSF parsers will see the
+`##`-prefix lines and either skip or error, depending on
+implementation. Worth flagging in the MAGMA pipeline notes when those
+run.
+
+**Repo changes from (18)(d) → (19)**:
+
+- `scripts/download_refs.sh` step 5d is **new**: auto-fetch the
+  EUR-ancestry public file at
+  `https://ndownloader.figshare.com/files/34517828` →
+  `gwas/scz_trubetskoy_eur_PGC3_v3.vcf.tsv.gz`. Step 6 (manual
+  Trubetskoy section) collapsed to a one-line note pointing at 5d
+  and at (19). Per-SNP N status table at the bottom of the script
+  updated.
+- `scripts/README.md`: the "datasets that require accounts" list
+  retracted PGC; "first-run notes" item on Trubetskoy N updated to
+  the per-SNP `n_eff` column.
+
+**Net effect on the critical path**: all four GWAS are now
+auto-fetchable. There is no PGC registration clock to start. The
+remaining human-in-the-loop items on the critical path are: PI
+confirmation of v2 (per (18)(c)) and Hummingbird re-access for the
+TAURUS + Garrido runs. Neither is an SCZ-download issue.
+
+Files updated in this batch:
+
+- `scripts/download_refs.sh` (new step 5d auto-fetch; step 6 collapsed;
+  per-SNP N status table updated).
+- `scripts/README.md` (retract PGC from accounts-required list;
+  update Trubetskoy N notes).
+- `DECISIONS.md` (this entry).
+
 
 
 
