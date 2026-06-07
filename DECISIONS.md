@@ -49,7 +49,7 @@ prioritization in UC, comparing regime 1 (single-atlas) and regime 2
 - **Integration-pipeline-robustness comparator:** Pan-GI / Oliver 2024
   (with/without donor-overlap analysis). Pan-GI integrated Smillie 2019 and
   anchored Kong 2023; 2/3 of trio donors are inside Pan-GI.
-- **Fallbacks:** Garrido-Trigo 2023, Boland 2020, Devlin/Zhao 2023.
+- **Fallbacks:** Garrido-Trigo 2023, Boland 2020, ~~Devlin/Zhao 2023~~ [struck — DECISIONS 23(b)].
 - **Atlas preprocessing:** take published preprocessing as-is (Option B).
   Doublet/ambient/QC differences across atlases are disclosed in Methods
   Limitations. Marker-gene QC at end of M2 catches the worst label-mismatch
@@ -2469,6 +2469,102 @@ Files updated in this batch:
 - `.gitignore` (added `data/gwas/*.snp.loc` + `data/gwas/*.pval`
   patterns; intermediates, regenerable from sumstats).
 - `DECISIONS.md` (this entry).
+
+---
+
+## CORRECTION 2026-06-07 (25): Post-munge review — LDSC elevated to pre-narrative gate; Yengo cross-checked; Devlin/Zhao mark in brief
+
+Saisohan's 2026-06-07 review of (24) flagged one elevation, one
+cross-check, two minor doc fixes.
+
+### (a) de Lange LDSC intercept elevated out of M3-sanity.
+
+(24)(c) parked the LDSC intercept under "M3 sanity scaffolding."
+Wrong tier: this is the validity check on the **primary GWAS**, not a
+generic sanity item. Promoted to a tracked pre-narrative gate
+(**OPEN_FLAGS F10**) with the nuance:
+
+- Does NOT block heatmap *generation* — de Lange is the same GWAS
+  across all five atlases; any stratification is a shared input and
+  doesn't differentially distort cross-atlas agreement.
+- DOES block the *biological narrative* on that heatmap. "Atlases
+  concordantly rank cell type X for UC" carries biological weight
+  only if de Lange isn't confounded.
+
+Schedule: LDSC pipeline must clear **before M4 manuscript draft**,
+not after. Don't let M3 slide past M4.
+
+### (b) Yengo λ_GC = 5.20 cross-checked — munge is clean.
+
+Saisohan: theoretical Bulik-Sullivan framing isn't enough; a value
+that extreme is also exactly what a munge bug produces (wrong N col,
+wrong stat col, allele mismatches all inflate λ_GC). Verified
+empirically:
+
+| Metric | de Lange UC | Yengo height |
+|---|---|---|
+| n_snps | 9,486,539 | 1,180,302 |
+| λ_GC | 1.1724 | 5.1992 |
+| mean(χ²) | 1.27 | 14.91 |
+| n GW-sig (p<5e-8) | 7,392 | 115,546 |
+| N column range | 45,975 / 45,975 | 344 / 1,597,374 |
+
+Findings:
+
+- de Lange clean: λ_GC, mean(χ²), and GW-sig count all in band for
+  a polygenic UC GWAS at N=46k. The `--n-fixed` path worked
+  (N column constant at 45,975). 7,392 raw GW-sig SNPs collapses
+  to ~200-300 LD-independent loci per de Lange 2017 Fig. 1.
+- Yengo cross-check resolved:
+  - **mean(χ²) = 14.9** is plausible for height at N=1.6M — height
+    is the most polygenic common trait there is. Published Yengo
+    2022 reports mean(χ²) in the mid double digits for the EUR
+    discovery; 14.9 is in the published-deposit band, not a bug.
+  - **λ_GC = 5.20 vs published ~3-4 in the main analysis.** Modest
+    discrepancy explainable by the deposit's SNP-set difference
+    (the GWAS Catalog deposit appears to be MAF-and-INFO-pre-
+    filtered to a HM3-scale set of 1.37M SNPs vs the paper's full
+    discovery panel of ~12M; λ_GC is sensitive to the SNP universe).
+    Not a munge bug.
+  - **115k GW-sig SNPs (10%)** consistent with massive polygenic
+    signal at large N (post-LD pruning will collapse to the paper's
+    ~12,000 independent loci).
+  - **Per-SNP N varies 344 → 1,597,374** — real Yengo deposit shape
+    (rare variants tested only in small sub-cohorts), passed straight
+    through. MAGMA's gene-test is N-weighted; high-N SNPs dominate.
+    Worth documenting but not a fix item.
+
+Yengo positive control should light up the right cells in MAGMA.
+
+### (c) SNP-density adequacy for MAGMA gene coverage — confirmed.
+
+Saisohan flagged the 8× SNP-density asymmetry (de Lange 9.5M vs
+Yengo 1.18M) as a possible coverage starvation risk for the positive
+control. Empirical density across the 2,881 Mb autosome span:
+
+- **de Lange**: 3,293 SNPs/Mb → ~231 SNPs per 10-kb-windowed gene.
+  22/22 chr coverage, per-chr range 127k–798k.
+- **Yengo**: 410 SNPs/Mb → ~29 SNPs per 10-kb-windowed gene.
+  22/22 chr coverage, per-chr range 17k–99k.
+
+29 SNPs per windowed gene is plenty for MAGMA's gene-test (a few
+SNPs is usually enough for the gene-Z to converge). Positive control
+is a fair test of the method, not a coverage-starved one.
+
+### (d) Devlin/Zhao struck mark in the historical PI brief.
+
+(23)(b) left Devlin/Zhao 2023 noted-in-DECISIONS-only rather than
+marked inline at DECISIONS.md line 52 (the original PI brief). Per
+Saisohan: same history-read-as-live trap that had us chasing the
+dead Mennillo / GSE229072 accession. Updated the brief line to
+`~~Devlin/Zhao 2023~~ [struck — DECISIONS 23(b)]` so a future scan
+of the brief surfaces the strike rather than the stale entry.
+
+Files updated in this batch:
+
+- `OPEN_FLAGS.md` (F10 added: de Lange LDSC intercept pre-narrative
+  gate).
+- `DECISIONS.md` (line 52 Devlin/Zhao inline struck mark; this entry).
 
 
 

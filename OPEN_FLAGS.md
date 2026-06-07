@@ -153,6 +153,38 @@ no `CANONICAL_FINE` import path created until TAURUS has populated and
 Saisohan signs off on the bucket list. **Does NOT block** the broad-tier
 figure (DECISIONS 22 unblocks that side).
 
+## F10 · de Lange LDSC intercept — pre-narrative gate (NOT M3-sanity)
+**Validity check on the primary GWAS, elevated tier vs generic sanity
+scaffolding.** Per Saisohan 2026-06-07: λ_GC conflates polygenic
+signal with stratification confound (Bulik-Sullivan 2015 *Nat Genet*);
+the LDSC intercept is what separates them. de Lange UC GCST004133
+munged with λ_GC = 1.1724 — slightly over the rule-of-thumb 1.10 but
+in-band for a well-powered polygenic UC GWAS. **The intercept is what
+gates interpretation, not generation.**
+
+Nuance — what this gate does and doesn't block:
+- **Does NOT block** the 3×3 broad-tier concordance heatmap. de Lange
+  is the same GWAS across all five atlases; any stratification is a
+  shared input and doesn't differentially distort cross-atlas
+  agreement. Compute the heatmap, look at the structure.
+- **DOES block** the *biological narrative* on the heatmap.
+  "Atlases concordantly rank cell type X for UC" only carries
+  biological weight if de Lange isn't confounded. Without the
+  intercept clear, the heatmap is a methods result, not a biology
+  result.
+
+Resolution path: LDSC pipeline. Not currently in `code/01_magma/` —
+needs setup (LDSC python package + EUR LD scores) before the
+intercept can land. **Do this before the M4 narrative write-up,
+not after.** Liu UC + Yengo height should get the same treatment
+once the pipeline is in place (Liu for the cross-GWAS sensitivity
+narrative; Yengo as positive-control calibration).
+
+- **Bites at:** the heatmap-to-narrative transition (M4). Pre-narrative
+  gate, NOT pre-figure gate. Don't let M3 slide past M4 — if the
+  intercept hasn't cleared before the manuscript draft, the result
+  paragraph cannot be written without an explicit caveat.
+
 ## F9 · MT% pre-bank gate (must run before the first broad heatmap)
 **Gate, not footnote.** Before treating the first 3×3 broad-tier
 concordance figure as real, eyeball MT-hi cell counts + MT%
