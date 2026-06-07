@@ -163,13 +163,20 @@ cat <<EOF
   --------------------------------------------------------------------------
 
   6. Trubetskoy 2022 schizophrenia (negative control) — Nature 604:502.
-     GWAS Catalog accession GCST90128471, but full summary statistics are
-     NOT hosted there (fullPvalueSet = False). Download from PGC instead:
+     ** HUMAN-IN-THE-LOOP DELAY — START REGISTRATION NOW. **
+     GWAS Catalog accession GCST90128471 exists, but full summary
+     statistics are NOT hosted there (fullPvalueSet = False). Download
+     from PGC instead:
        https://www.med.unc.edu/pgc/download-results/
-     Registration required; the PGC3 SCZ file is the multi-ancestry meta
-     (53,386 EUR + 14,004 EAS + 6,152 AA + 1,234 Latino cases). Save as:
+     PGC registration is a multi-day human-driven approval step
+     (account + data-access form + manual review). Submit the request
+     now even though Hummingbird access is offline — the delay is the
+     same whether you submit today or in a week, but the wait clock
+     only starts after submission. The PGC3 SCZ file is the multi-
+     ancestry meta (53,386 EUR + 14,004 EAS + 6,152 AA + 1,234 Latino
+     cases). Save as:
        \$UCC_DATA/gwas/scz_trubetskoy.tsv.gz
-     See DECISIONS correction (14).
+     See DECISIONS corrections (14), (18)(d).
 
 After every download, sanity-check column names with:
     zcat <file> | head -2

@@ -22,18 +22,24 @@ filter step.
 canonical 15-term vocab. All four hierarchy levels are preserved in obs
 for downstream use.
 
-**Filter chain (v1)**:
+**Filter chain (v1)** — three stages, NOT four:
 
 1. Disease == UC (drop CD + HC).
 2. Region in colonic set (drop terminal ileum; keep ascending /
    descending / sigmoid / rectum and any other non-ileal label).
 3. Timepoint == baseline / W0 / pretreatment (drop post-treatment).
-4. ``inflammation_score > 6.5`` per the Zenodo description's
-   "baseline samples > 6.5 inflammation score" criterion.
 
-Each stage logs n_dropped + n_kept. The order is intentional:
-disease-first filter is the largest drop and produces the per-disease
-sample table the inflammation threshold expects.
+The Zenodo deposit description suggests ``inflammation_score > 6.5``
+as the cutoff for the paper's inflamed-baseline remission analysis;
+this loader **does not apply that filter** because doing so would
+(a) drop ~half of UC baseline samples (Fig. 2b: 50 inflamed vs 53
+non-inflamed); (b) pre-empt OPEN_FLAGS F1, which must set one
+inflamed/non-inflamed/pooled policy uniformly across all three UC
+atlases (Smillie and Garrido are not inflamed-only); (c) skew the
+cell-type composition toward inflammation-expanded subsets and
+distort GWAS prioritization. ``inflammation_score`` is preserved as
+obs metadata so F1 can apply its policy downstream of all three
+loaders. See DECISIONS correction (18)(a).
 
 **Validation gates** (mirror correction 9 / 12 / 16 patterns):
 
@@ -86,9 +92,13 @@ POOLED_FILENAME = "TAURUS_raw_counts_annotated_final.h5ad"
 POOLED_MD5 = "c1bd13b92cacb164a401c6c4a4e7912c"
 
 # ---- Filter constants ---------------------------------------------------
-# Per the Zenodo deposit description: "For baseline analyses, please use
-# baseline samples > 6.5 inflammation score".
-BASELINE_INFLAMMATION_MIN: float = 6.5
+# The Zenodo deposit description suggests ``inflammation_score > 6.5`` as
+# the cutoff for the paper's inflamed-baseline analysis. This loader
+# deliberately does NOT apply that filter — see DECISIONS (18)(a) and the
+# module docstring. Constant retained as documentation for any future
+# inflamed-only sensitivity that goes through the F1 cross-atlas
+# inflammation policy.
+PAPER_BASELINE_INFLAMMATION_MIN: float = 6.5  # NOT applied; see (18)(a)
 
 # Disease values to keep / drop after canonicalization (UC + HC + CD all
 # get canonicalized to short strings by _canonicalize_disease).
@@ -109,10 +119,19 @@ BASELINE_TIMEPOINT_KEYS: tuple[str, ...] = (
     "w0", "week 0", "week_0", "wk0", "v1", "visit 1", "visit_1",
 )
 
-# ---- Hard invariants (Thomas 2024, Fig. 2b + Methods) -------------------
-EXPECTED_N_UC_DONORS_POST_FILTER: int = 22
-# Cell count post-filter is not pinned in the paper Methods — left as a
-# soft tripwire on first run.
+# ---- Donor-count expectations (Thomas 2024) -----------------------------
+# After the disease=UC × colonic × baseline filter, the surviving donor
+# count is bounded above by the full UC cohort (22; Fig. 2b) and below by
+# whichever subset of those 22 actually contributed a pretreatment colonic
+# sample (the paper's baseline analysis cohort in Fig. 4c is 4 + 13 = 17
+# UC patients with pretreatment samples, AFTER their own inflamed filter
+# that we are NOT applying here). True value depends on the obs metadata
+# in the pooled file and is captured on first run; ranges below are for
+# diagnostics, not hard gates.
+EXPECTED_N_UC_DONORS_RANGE: tuple[int, int] = (15, 22)
+
+# Cell count post-filter is not pinned anywhere in the paper Methods —
+# left as a soft tripwire on first run.
 EXPECTED_N_CELLS_HINT: int | None = None  # set after first-run capture
 
 # ---- Schema auto-detect candidates --------------------------------------
@@ -420,16 +439,20 @@ def load(
         n_drop_timepoint, len(obs),
     )
 
-    # Stage D: inflammation_score > 6.5.
-    infl_numeric = pd.to_numeric(obs[icol], errors="coerce")
-    keep_infl = infl_numeric > BASELINE_INFLAMMATION_MIN
-    n_drop_infl = int((~keep_infl).sum())
-    n_nan_infl = int(infl_numeric.isna().sum())
-    obs = obs[keep_infl.fillna(False)].copy()
+    # NOTE: inflammation_score > 6.5 is NOT applied here. The paper's
+    # inflamed-baseline cutoff is preserved as obs metadata so OPEN_FLAGS
+    # F1 can apply one inflamed/non-inflamed/pooled policy uniformly
+    # across Smillie + Garrido + TAURUS downstream. See DECISIONS (18)(a)
+    # and the module docstring for the rationale.
+    infl_summary = pd.to_numeric(obs[icol], errors="coerce")
     logger.info(
-        "Filter D (inflammation_score > %g): dropped %d (of which %d "
-        "were NaN), kept %d",
-        BASELINE_INFLAMMATION_MIN, n_drop_infl, n_nan_infl, len(obs),
+        "Carrying inflammation_score through obs (NOT filtering): "
+        "n_with_score=%d, n_NaN=%d, range=[%s, %s], n>6.5=%d (the paper's "
+        "inflamed-baseline analysis cutoff, applied by F1 downstream).",
+        int(infl_summary.notna().sum()), int(infl_summary.isna().sum()),
+        f"{infl_summary.min():.2f}" if infl_summary.notna().any() else "—",
+        f"{infl_summary.max():.2f}" if infl_summary.notna().any() else "—",
+        int((infl_summary > PAPER_BASELINE_INFLAMMATION_MIN).sum()),
     )
 
     logger.info(
@@ -451,18 +474,35 @@ def load(
     # Replace obs with our augmented one (carries _disease_canon).
     adata_sub.obs = obs
 
-    # ---- 5. Hard donor-structure invariant. ----
+    # ---- 5. Donor-structure check — logged expected-range, not a hard pin. ----
+    # The exact count of UC patients with a pretreatment colonic sample
+    # is not in the paper Methods; it lives in Supp Table 1. The upper
+    # bound is 22 (full UC cohort) and Fig. 4c shows 17 with pretreatment
+    # samples after the paper's own inflamed filter (which we don't
+    # apply). Hard-fail only on impossible values; warn outside the
+    # expected range; per-donor breakdown always logged for triage.
     n_uc_donors = int(adata_sub.obs[dcol].nunique())
-    if n_uc_donors != EXPECTED_N_UC_DONORS_POST_FILTER:
-        breakdown = adata_sub.obs[dcol].value_counts().head(30).to_dict()
+    breakdown = adata_sub.obs[dcol].value_counts().head(30).to_dict()
+    if n_uc_donors == 0 or n_uc_donors > 60:
         raise ValueError(
-            f"TAURUS loader: donor-structure invariant violated. Got "
-            f"n_uc_donors={n_uc_donors}; expected "
-            f"{EXPECTED_N_UC_DONORS_POST_FILTER} (Thomas 2024 Fig. 2b). "
-            f"Per-donor cell counts (top 30): {breakdown}. If the paper "
-            f"cohort changed or a filter is wrong, fix here; if the "
-            f"expected count is stale, update "
-            f"EXPECTED_N_UC_DONORS_POST_FILTER."
+            f"TAURUS loader: implausible donor count after filter "
+            f"(n_uc_donors={n_uc_donors}). Filter chain almost certainly "
+            f"misconfigured (e.g., wrong column auto-detected). "
+            f"Per-donor cell counts (top 30): {breakdown}."
+        )
+    lo, hi = EXPECTED_N_UC_DONORS_RANGE
+    if not (lo <= n_uc_donors <= hi):
+        logger.warning(
+            "TAURUS UC donor count %d is outside the expected range "
+            "[%d, %d] (Thomas 2024). Not a hard failure — could be a "
+            "metadata drift or a per-Supp-Table-1 reconciliation that "
+            "hasn't happened yet. Per-donor cell counts (top 30): %s",
+            n_uc_donors, lo, hi, breakdown,
+        )
+    else:
+        logger.info(
+            "UC donor count %d within expected range [%d, %d]; %d donors "
+            "in this subset.", n_uc_donors, lo, hi, n_uc_donors,
         )
 
     if EXPECTED_N_CELLS_HINT is not None and adata_sub.n_obs != EXPECTED_N_CELLS_HINT:

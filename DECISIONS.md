@@ -1616,6 +1616,139 @@ Files updated in this batch:
   `scripts/slurm/README.md` (validation strings, arrays, examples).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-06 (18): Post-(17) audit — inflammation filter pulled, donor invariant relaxed, v2 escalation rolled back
+
+The (17) loader had two bugs that would crash or silently halve the
+first TAURUS run, plus an inferred-v2-commitment escalation that wasn't
+PI-confirmed. Fixed before the file is staged.
+
+### (a) Filter D (`inflammation_score > 6.5`) PULLED from the chain.
+
+The Zenodo deposit description says "For baseline analyses, please use
+baseline samples > 6.5 inflammation score". (17) read that as a
+subsetting rule. It is not. It is the paper's **analytical convention**
+to recapitulate its own remission analysis on inflamed baseline
+tissue. Applying it as a load-time filter has three problems:
+
+1. Drops roughly half of UC baseline samples (Fig. 2b: 50 inflamed vs
+   53 non-inflamed).
+2. Pre-empts OPEN_FLAGS F1, which must set one inflamed / non-inflamed
+   / pooled policy uniformly across **all three** UC atlases. Smillie
+   and Garrido are not inflamed-only, so an inflamed-only TAURUS
+   silently breaks the cross-atlas comparability that is the entire
+   point of the study.
+3. Inflamed-only skews cell-type composition toward
+   inflammation-expanded subsets and distorts GWAS prioritization.
+
+**Resolution.** The 4-stage chain is now **3 stages** — disease=UC →
+colonic → baseline. `inflammation_score` is carried through as obs
+metadata (already was in (17)'s `_finalize`) so F1 can apply one
+policy downstream. The deposit's 6.5 cutoff is retained as the
+documented constant `PAPER_BASELINE_INFLAMMATION_MIN` for any future
+inflamed-only sensitivity analysis that goes through F1, but it is
+**not applied** in this loader. Logging at the inflammation step is
+now informational: count of non-NaN scores, min/max, and the count
+above 6.5 — gives F1 enough to design the cross-atlas policy without
+binding TAURUS to it.
+
+### (b) Donor invariant relaxed from hard `==22` to logged expected-range.
+
+(17)'s hard `EXPECTED_N_UC_DONORS_POST_FILTER = 22` assertion would
+have crashed the first run. 22 is the full UC cohort (Fig. 2b — all
+timepoints, inflamed + non-inflamed). The (3-stage) subset above is
+baseline-only, and Fig. 4c shows only 4 + 13 = 17 UC patients with
+pretreatment samples in the paper's own baseline analysis (after
+their inflamed filter, which we don't apply). So the post-filter
+count lies in `[17, 22]` depending on how many UC patients gave a
+pretreatment colonic biopsy at all. Without Supp Table 1 in hand to
+pin the exact number, hard-asserting 22 false-fails on a correct
+subset; and silently tuning it down to pass would let the (17)
+inflamed-only filter sneak through (the two bugs interact — see PI's
+warning).
+
+**Resolution.**
+
+- Constant renamed `EXPECTED_N_UC_DONORS_RANGE = (15, 22)`.
+- Hard-fail only on impossible values (`n_uc_donors == 0` — filter
+  misconfigured — or `> 60` — wrong column auto-detected).
+- Log a warning if outside the expected range; this surfaces metadata
+  drift or a needed Supp-Table-1 reconciliation without crashing the
+  load.
+- Per-donor cell breakdown always logged for triage.
+
+The exact number gets pinned empirically from the first end-to-end
+run + a cross-check against Supp Table 1.
+
+### (c) v2 commitment — rolled back to "PI-confirm-before-escalating-v1-paths".
+
+(17)(c) treated the user's "v2 is committed" statement as PI sign-off
+and escalated three CL IDs to **v1 critical-path-blocking** for the
+CANONICAL_BROAD lock. That was an overreach: confirmation that v2 is
+on the roadmap is not the same as PI sign-off that the v1 broad-tier
+first pass should wait on the v2-ready CL graph. The exact "build-it-
+twice risk" PI flagged is the reason to slow down here.
+
+**Rollback.**
+
+- v2 commitment recorded as **needs explicit PI confirmation** (the
+  one-question check PI asked for at the top of this turn). Pending
+  that, the F8 CL-aware track is the planned path but not yet locked
+  as a v1 dependency.
+- The three unresolved CL IDs (`CL:1000280`, `CL:0009039`,
+  `CL:0002073`) gate the eventual **v2-ready** `CANONICAL_BROAD` lock,
+  **not** the v1 first 5-atlas × broad-tier concordance pass. v1's
+  broad-tier output comes from each loader's existing
+  `FINE_TO_BROAD` / `LOW_TO_BROAD` mapping into the same 15-string
+  `_BROAD_VOCAB` frozenset. The two-gate canonical-vocab assertion
+  already enforces string equality across all three UC loaders, which
+  is what step 06 needs.
+- `canonical_broad_DRAFT.md` is the substrate for the eventual lock;
+  not a runtime dependency of step 06.
+
+This decouples the critical paths: **v1 first results** unblocks on
+TAURUS loader + GWAS munge (the PI's narrow critical path); **v2-ready
+CANONICAL_BROAD** unblocks on the three CL IDs (Muskaan biology call)
++ PI v2 confirmation. Those two paths run in parallel and neither
+waits on the other for its own milestones.
+
+### (d) Trubetskoy PGC registration — escalated in download_refs.sh.
+
+(14) noted PGC registration as a manual step but did not flag the
+human-in-the-loop delay. (17) listed it as "flagged but not done in
+this commit". This correction bumps the visibility:
+`scripts/download_refs.sh` step 6 now opens with
+`** HUMAN-IN-THE-LOOP DELAY — START REGISTRATION NOW. **` and an
+explicit "submit the request now even though Hummingbird access is
+offline" instruction. The PGC review is the rate-limiting step for
+the SCZ negative-control GWAS, so the wait clock should start at the
+earliest possible moment.
+
+This is the only critical-path item that can be advanced from a
+non-HPC laptop without writing code — submitting the registration
+form. Cannot be done from this session (the form is browser-based
+behind a registration wall); flagged for human action.
+
+### Net status
+
+PI's narrow critical path is unchanged: TAURUS loader (done in (17),
+hardened in (18)(a)+(b)) + 4 GWAS munged. With (a) + (b) fixed, the
+loader is safe to stage; the first run will not crash on a correct
+subset, and will not silently halve the cohort. The donor count will
+be captured empirically and reconciled against Supp Table 1 on first
+run.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_taurus.py` (Filter D removed; constants
+  renamed; donor invariant relaxed to logged expected-range; module
+  docstring updated; informational inflammation-score logging in
+  place of the dropped filter).
+- `scripts/download_refs.sh` (Trubetskoy step 6 — human-in-the-loop
+  emphasis).
+- `DECISIONS.md` (this entry).
+
 
 
 
