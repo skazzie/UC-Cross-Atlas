@@ -52,6 +52,16 @@ def parse_args():
              "Locked v1 keeps autosomes only; only set this for exploratory analyses.",
     )
     p.add_argument(
+        "--n-min-frac",
+        type=float,
+        default=0.67,
+        help="Drop SNPs whose per-SNP N is below this fraction of max(N). "
+             "Matches LDSC munge_sumstats default (0.67); discards the noisy "
+             "low-N tail from meta-analyses where some variants are tested in "
+             "small sub-cohorts. No-op when --n-fixed is used (every SNP shares "
+             "the same N). Set to 0 to disable. See DECISIONS correction 26.",
+    )
+    p.add_argument(
         "--lambda-gc-out",
         default=None,
         help="If set, compute genomic inflation factor lambda_GC and write to this path "
@@ -118,8 +128,22 @@ def main():
     pval.columns = ["SNP", "P"]
     if args.col_n and args.col_n in df.columns:
         pval["N"] = df[args.col_n].astype(int).values
+        if args.n_min_frac > 0:
+            n_max = int(pval["N"].max())
+            n_threshold = int(n_max * args.n_min_frac)
+            n_before = len(pval)
+            pval = pval[pval["N"] >= n_threshold]
+            n_dropped = n_before - len(pval)
+            print(f"[prepare_gwas] N filter: drop SNPs with N < {n_threshold:,} "
+                  f"({args.n_min_frac:.2f} x max={n_max:,}); kept {len(pval):,} of "
+                  f"{n_before:,} ({n_dropped:,} dropped, {100*n_dropped/n_before:.1f}%)",
+                  flush=True)
+            # Keep snp_loc in sync with pval after the N filter.
+            snp_loc = snp_loc[snp_loc["SNP"].isin(pval["SNP"])]
     else:
         pval["N"] = args.n_fixed
+        # --n-fixed path: every SNP shares one N, so the LDSC-style low-N tail
+        # filter is a no-op and is skipped silently.
     pval = pval.drop_duplicates(subset=["SNP"])
 
     out_prefix = Path(args.out_prefix)

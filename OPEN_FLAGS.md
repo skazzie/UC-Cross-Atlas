@@ -8,19 +8,16 @@ _Last updated: June 7, 2026._
 
 ---
 
-## F1 · UC tissue definition — inflamed vs non-inflamed
-Smillie's `Health` field has **three** states: Healthy / Non-inflamed / Inflamed — UC
-patients contribute both inflamed and non-inflamed biopsies. Decide whether the UC group
-is inflamed-only, non-inflamed-only, or pooled — and make it **consistent across all
-atlases** (confirm what Garrido's and TAURUS's "UC" tissue actually is — TAURUS is anti-TNF longitudinal, so the time-point chosen sets the inflamed/non-inflamed status). A mismatch
-(e.g. Garrido = inflamed biopsies, Smillie = pooled) would confound concordance as
-biology, not method.
-- **Smillie structure (confirmed):** 12 healthy controls + 18 UC patients, paired —
-  every UC patient contributed both an inflamed and a non-inflamed biopsy. Cells:
-  110,110 Healthy / 125,119 Inflamed / 130,263 Non-inflamed (~366k total). UC-as-inflamed
-  = 125k cells; UC-pooled = 255k from the same 18 patients (each present as 2 samples).
-- **Bites at:** harmonization + concordance. The loader must *capture* `Health` now; the
-  grouping decision is needed before the UC group is subset.
+## ~~F1 · UC tissue definition — inflamed vs non-inflamed~~ — RESOLVED 2026-06-07 (DECISIONS 26)
+Locked: **pool all UC cells for the first 3×3 broad heatmap** (inflamed
++ non-inflamed combined as one "UC" group). Inflamed-vs-non-inflamed
+stratification is a **Phase-9 sensitivity panel**, not a v1-figure
+gate. Applies uniformly across Smillie / Garrido / TAURUS — TAURUS's
+baseline-pretreatment timepoint includes both inflamed and
+non-inflamed biopsies per the rev2 PDF cohort breakdown (39 inflamed
++ 13 non-inflamed of the 52 baseline samples). Loaders already capture
+the inflammation state in obs (`health` / `inflammation_score`), so
+the Phase-9 split is a downstream subset, no re-load needed.
 
 ## ~~F2 · Garrido QC-state labels (MT / heat-shock / IER)~~ — RESOLVED 2026-06-07 (DECISIONS 22)
 Resolved as a cross-atlas `QC_STATE_TO_PARENT` collapse policy in
@@ -224,6 +221,8 @@ specific cells, NOT change the cross-atlas rule).
 ---
 
 ### Resolved (moved to DECISIONS.md)
+- **F1** — UC tissue inflamed/non-inflamed/pooled → DECISIONS 26(b).
+  Locked: pool for first heatmap; Phase-9 stratification sensitivity.
 - **F2** — Garrido QC-state labels (MT / heat-shock / IER) → DECISIONS 22(a).
   Cross-atlas `QC_STATE_TO_PARENT` collapse policy in `_qc_policy.py`.
 - **F3** — Garrido lineage-ambiguous cycling labels → DECISIONS 22(b).
