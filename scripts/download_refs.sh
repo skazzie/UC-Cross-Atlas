@@ -143,9 +143,10 @@ cat <<EOF
        \$UCC_DATA/atlases/garrido_trigo.h5ad
 
   3. TAURUS-IBD (Thomas 2024) — Zenodo deposit; replaces the previously
-     planned Mennillo 2024 per DECISIONS correction (16). Pin Zenodo
-     version (10.5281/zenodo.13768607 vs 10.5281/zenodo.14007626) before
-     download. CC-BY-4.0, public, ~27.9 GB total. Subset to UC donors
+     planned Mennillo 2024 per DECISIONS correction (16). Pinned to Zenodo
+     v3: 10.5281/zenodo.14007626 (TAURUS_raw_counts_annotated_final.h5ad
+     md5 c1bd13b92cacb164a401c6c4a4e7912c, 12.7 GB). CC-BY-4.0, public,
+     27.9 GB total across the pooled file + per-lineage h5ads. Subset to UC donors
      only + a single time-point per donor on load. Save as:
        \$UCC_DATA/atlases/taurus.h5ad
 

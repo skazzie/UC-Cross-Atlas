@@ -2,7 +2,7 @@
 
 CELLxGENE deposits store gene identifiers as Ensembl IDs in ``var_names``
 and the corresponding HGNC symbol in ``var['feature_name']``. Loaders
-that ship raw symbols (Smillie SCP259, Mennillo GEO) skip the
+that ship raw symbols (Smillie SCP259) skip the
 ``feature_name`` step. Downstream MAGMA / scDRS / seismicGWAS code
 matches on HGNC symbols, so every loader's final step is to remap
 ``var_names`` to symbols, drop duplicates, and filter to the

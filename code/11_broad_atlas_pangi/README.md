@@ -90,7 +90,7 @@ python code/11_broad_atlas_pangi/run_pangi_comparison.py \
     --pangi-results-base results/pangi \
     --pangi-no-elmentaite-results-base results/pangi_no_elmentaite \
     --pangi-no-smillie-results-base results/pangi_no_smillie \
-    --uc-atlases smillie garrido_trigo mennillo \
+    --uc-atlases smillie garrido_trigo taurus \
     --gwas delange liu \
     --methods scdrs seismic \
     --tiers broad fine \

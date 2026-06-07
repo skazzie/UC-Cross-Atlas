@@ -92,7 +92,7 @@ inner-join.
   (`epithelial`, `T`, `fibroblast`, `mast` — none of which appear as
   standalone fine clusters in the original 91). Stored in
   `obs['cell_type_fine']`. Hyper-specific states (PC IgA heat shock
-  1/2, M1 ACOD1, etc.) won't map cleanly to Smillie/Mennillo; the
+  1/2, M1 ACOD1, etc.) won't map cleanly to Smillie/TAURUS; the
   cross-atlas fine intersection is expected to be modest — do not
   oversell "91-way fine concordance."
 - **broad_tier**: 15-level roll-up via `FINE_TO_BROAD` in
@@ -146,7 +146,7 @@ the marker xlsx and the annotation CSV.
 
 - `X`: **log1p(CP10k) float32**, computed by the loader on read from the
   RAW.tar integer counts. Uniform input state across atlases (same
-  treatment Smillie and Mennillo get; CELLxGENE-sourced HCA/Pan-GI
+  treatment Smillie and TAURUS get; CELLxGENE-sourced HCA/Pan-GI
   already ship in this form).
 - `layers['counts']`: raw integer counts preserved from the RAW.tar
   MatrixMarket files.
@@ -380,7 +380,7 @@ flagged inline; M2 marker-QC moves them into DECISIONS once resolved.
 ## taurus (DEFERRED — replaces Mennillo per DECISIONS 16)
 
 - **Source**: Zenodo (Thomas, Dendrou, Agarwal — Oxford, 2024).
-  - DOI cited in swap directive: `10.5281/zenodo.13768607`
+  - DOI cited in swap directive: `10.5281/zenodo.14007626 (v3)`
   - DOI resolved 2026-06-06:     `10.5281/zenodo.14007626`
   - Pin which version is canonical before loader implementation.
 - **Paper**: "A longitudinal single-cell atlas of anti-tumour necrosis

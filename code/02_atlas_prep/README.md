@@ -13,8 +13,8 @@ analysis.
   + 6 active UC. (Previously listed as "Kong 2023" — see DECISIONS.md
   correction 2026-05-20 (2/7).)
 - **TAURUS-IBD** (Thomas et al. 2024, Zenodo
-  `10.5281/zenodo.13768607` / `10.5281/zenodo.14007626` — pin version
-  before download) — longitudinal anti-TNF single-cell atlas (UC + CD).
+  `10.5281/zenodo.14007626` (v3, pinned 2026-06-06; md5 of pooled file
+  `c1bd13b92cacb164a401c6c4a4e7912c`)) — longitudinal anti-TNF single-cell atlas (UC + CD).
   Subset to **UC donors only** and a **single time-point per donor**
   (pre-treatment baseline preferred). Replaces the previously-planned
   Mennillo 2024 (anti-integrin) per DECISIONS 16. Verify ≥8 UC donors
@@ -84,7 +84,7 @@ both log and non-log scale). Raw counts are only relevant when
 `flag_raw_count=True`, which applies CP10k + log1p internally; v1 locks
 `--flag-raw-count False` uniformly across all five atlases (DECISIONS
 correction 5/7), so the log-normalized matrix is the input contract.
-Loaders that ship raw counts (Smillie SCP259, Mennillo GEO, Garrido-Trigo
+Loaders that ship raw counts (Smillie SCP259, TAURUS Zenodo, Garrido-Trigo
 RAW.tar once the correction-9 rewrite lands) apply `log1p(CP10k)` on load
 and preserve raw counts in `layers['counts']`.
 

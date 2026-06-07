@@ -27,7 +27,7 @@
 # Submit examples:
 #   sbatch --export=ALL,ATLAS=smillie,GWAS=delange       scripts/slurm/03_scdrs_compute.slurm
 #   sbatch --export=ALL,ATLAS=garrido_trigo,GWAS=delange scripts/slurm/03_scdrs_compute.slurm
-#   sbatch --export=ALL,ATLAS=mennillo,GWAS=delange      scripts/slurm/03_scdrs_compute.slurm
+#   sbatch --export=ALL,ATLAS=taurus,GWAS=delange        scripts/slurm/03_scdrs_compute.slurm
 #   sbatch --export=ALL,ATLAS=smillie,GWAS=liu      scripts/slurm/03_scdrs_compute.slurm
 #   ...
 #
@@ -52,7 +52,7 @@ cd "$UCC_REPO"
 
 # ---- Required parameters -------------------------------------------------
 
-: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|taurus|hca_gut|pangi}"
 : "${GWAS:?set GWAS=delange|liu|scz}"
 
 GS_SUFFIX="${GS_SUFFIX:-}"
@@ -79,8 +79,10 @@ echo "[03_scdrs] atlas=$ATLAS  gwas=$GWAS  seed=$SEED  out=$OUT"
 
 # NOTE (DECISIONS.md correction 2026-05-20 (5/7)): CELLxGENE atlases ship
 # log-normalized X with no raw layer. v1 policy locks --flag-raw-count False
-# uniformly across all atlases. Mennillo (GEO raw counts) is re-normalized
-# via log1p(CP10k) in load_mennillo.py to keep input distributions comparable.
+# uniformly across all atlases. Smillie SCP259, Garrido RAW.tar, and TAURUS
+# Zenodo all ship raw counts; their loaders re-normalize via log1p(CP10k)
+# to keep input distributions comparable. (Per DECISIONS 16, TAURUS-IBD
+# replaced the previously planned Mennillo as the third UC core atlas.)
 scdrs compute-score \
     --h5ad-file "$H5AD" \
     --gs-file "$GS" \

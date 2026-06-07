@@ -43,7 +43,7 @@ columns `atlas`, `gwas`, `tier`, `spearman_rho`, `ci_lo`, `ci_hi`,
 
 ```bash
 python code/08_cross_method/run_cross_method.py \
-    --atlases smillie garrido_trigo mennillo \
+    --atlases smillie garrido_trigo taurus \
     --gwas delange liu \
     --tiers broad fine \
     --scdrs-dir results/scdrs \

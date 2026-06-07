@@ -1424,6 +1424,198 @@ change to the (14) pick.**
 - **Effective N (UC GWAS)**: 36k (de Lange) vs 87k (Liu) — that's the
   number for the Li-2025 power discussion, not the totals.
 
+---
+
+## CORRECTION 2026-06-06 (17): TAURUS DOI v3 locked + real loader + v2 commitment + hygiene sweep
+
+Post-(16) PI input resolved two open items and closes the TAURUS atlas
+side of the work that can be done from the laptop.
+
+### (a) Zenodo DOI v3 LOCKED.
+
+(16) left the canonical DOI open between `10.5281/zenodo.13768607`
+(swap directive) and `10.5281/zenodo.14007626` (resolved by Zenodo on
+2026-06-06). Confirmed by PI: **v3 = `10.5281/zenodo.14007626`** is the
+canonical pin. The 13768607 reference is presumably a stale versioned
+predecessor with broken metadata; treating it as canonical would have
+pulled a different file. All operational references in the repo are
+now on the v3 DOI:
+
+- `code/02_atlas_prep/load_taurus.py` — `ZENODO_DOI` constant.
+- `code/02_atlas_prep/atlas_schemas.md` — taurus section.
+- `code/02_atlas_prep/README.md` — atlas list.
+- `scripts/download_refs.sh` — TAURUS manual block.
+
+Pinned pooled file: `TAURUS_raw_counts_annotated_final.h5ad` (12.7 GB)
+with **md5 `c1bd13b92cacb164a401c6c4a4e7912c`**. The full Zenodo record
+also exposes 9 per-lineage h5ads + UMAP/PC coordinate files + a paired
+sample list; raw BAM/CellRanger at GEO `GSE282122` if the loader ever
+needs to fall back to per-sample reads.
+
+### (b) Real `load_taurus.py` shipped (replaces the (16) skeleton).
+
+The skeleton from (16) is replaced with a working loader. Cannot run
+yet (the 12.7 GB h5ad is not on disk; same shape as Smillie before
+SCP259 was staged), but every gate that does not need the bytes is in
+place and `python -c "import load_taurus"` is clean.
+
+**Schema captured from Thomas 2024 paper Methods + Zenodo description:**
+
+- 4-level cell-type hierarchy: `compartment` → `low` → `intermediate`
+  → `cell_state` (109 states at the finest tier). Loader emits all
+  four levels as obs columns; `cell_type_fine = cell_state` and
+  `cell_type_broad` is derived from the `low` tier via `LOW_TO_BROAD`.
+- Cohort: 16 CD + 22 UC + 3 HC = 41 subjects. v1 strictly UC-only per
+  PI directive (drop CD + HC).
+- Inflamed-baseline threshold: `inflammation_score > 6.5` (from the
+  Zenodo deposit description).
+- Tissue regions: terminal ileum vs colonic (ascending / descending /
+  sigmoid / rectum). v1 keeps colonic only.
+
+**Filter chain (4 stages, each logged per-stage):**
+
+1. Disease == UC (drop CD + HC). Disease values canonicalized via
+   `_canonicalize_disease` (`"ulcerative colitis"`/`"uc"`/etc. → `UC`).
+2. Region matches `COLONIC_REGION_KEYS` and does not match
+   `ILEAL_REGION_KEYS` (substring-based, case-insensitive).
+3. Timepoint matches `BASELINE_TIMEPOINT_KEYS` (`baseline`,
+   `pretreatment`, `W0`, `V1`, etc.).
+4. `inflammation_score > 6.5` (NaN drops).
+
+**Validation gates (mirror correction 9/12/16 discipline):**
+
+- Auto-detect obs columns from candidate-name lists; hard-raise on
+  no match with `obs.columns` dumped for triage. Explicit override
+  arguments on `load()` for every detected column.
+- Donor-structure hard invariant: **22 UC donors** post-filter (Thomas
+  Fig. 2b). Hard-raises with per-donor cell counts dumped if missed.
+- Cell-count tripwire: soft, currently unset (`EXPECTED_N_CELLS_HINT =
+  None`); populates on first end-to-end run.
+- Canonical-vocab two-gate assertion (matches Garrido + Smillie
+  loaders): gate 1 at module import validates
+  `LOW_TO_BROAD.values() ⊆ _BROAD_VOCAB`; gate 2 at end-of-load
+  validates emitted broad values. `LOW_TO_BROAD` ships **empty** in
+  this v0 because the `low`-tier label set is not in the paper
+  Methods text — gate 2 will fail loud on first run with the actual
+  labels listed, then the map gets populated (one commit per Muskaan
+  biology pass).
+- Counts pipeline: `log1p(CP10k)` on load (raw counts in filename);
+  raw integer counts preserved in `layers['counts']`;
+  `raw_count_mode=True` unsupported per (5/7).
+- HGNC remap via pinned `ensembl_to_hgnc` (correction 11).
+
+**Backed-mode read.** The 12.7 GB pooled file is opened with
+`ad.read_h5ad(path, backed='r')` for the filter phase, so we don't pay
+for materializing X until after the 4-stage filter has narrowed the
+cell set. Filtered subset is then materialized to memory. Memory
+footprint stays bounded; the alternative (full read then filter) would
+peak above the 12.7 GB file size.
+
+### (c) v2 committed → F8 is CL-aware, not cheap.
+
+PI confirmed: **v2 is committed.** This locks the F8 fine-tier
+harmonization to the **CL-aware path** (build it once against the
+pinned CL ontology), not the cheap-by-hand path. The
+`canonical_broad_DRAFT.md` and `data/reference/cl_terms_pinned.tsv`
+substrate from (13) is the right foundation; the broad vocab is the
+v1+v2 shared substrate. Operationally:
+
+- The 3 unresolved CL IDs from (13) (intestinal stem cell beyond
+  CL:0002250; colon epithelial progenitor; enteric glial cell)
+  **must** be resolved before CANONICAL_BROAD locks, because v2's
+  additional atlases will reference them too.
+- The 3 label-drift relabels from (13) should be double-checked by
+  Muskaan against the pinned 2026-03-26 TSV — same point applies for
+  v2 stability.
+- F8 fine-tier vocab construction will use the CL graph (subclass
+  relationships, not just label match) to harmonize across atlases.
+  Out of scope for tonight; the constraint just got documented.
+
+### (d) Repo hygiene sweep: operational Mennillo refs → TAURUS.
+
+Per PI directive ("grep the 26 Mennillo refs, confirm none are
+hardcoded operational paths, add the superseded-by (16)(a)
+breadcrumbs"), did the operational sweep. Every place where the atlas
+name is read as a runtime token now uses `taurus`:
+
+- `code/02_atlas_prep/cl_rollup_maps.yaml`: `mennillo: {}` →
+  `taurus: {}` (per-atlas rollup hook; `cl_rollup.py` reads this).
+- 4 slurm scripts (`03_scdrs_compute`, `04_seismic`, `donor_loo_array`,
+  `test_retest_array`): `ATLAS=…|mennillo|…` validation strings,
+  `ATLASES=(…)` arrays, and example sbatch commands all updated. The
+  `donor_loo_array` array bound now reads `--array=0-21` for TAURUS
+  (22 UC donors).
+- `scripts/slurm/README.md` and `scripts/README.md`: example loops
+  iterate `smillie garrido_trigo taurus`; the manual-fetch atlas list
+  updated; the per-atlas donor-count note updated.
+- `code/06_concordance/compute_concordance.py` and `code/06_concordance/README.md`:
+  example invocations with `taurus_delange_broad/...` result paths.
+- `code/07_regime2_meta/run_brown.py`: docstring example.
+- `code/08_cross_method/README.md`, `code/09_cross_gwas/README.md`,
+  `code/10_broad_atlas_hca/README.md`,
+  `code/11_broad_atlas_pangi/README.md`: `--atlases` / `--uc-atlases`
+  example invocations.
+- `code/03_scdrs/README.md`: all-cells policy rewritten to reflect
+  TAURUS's UC-only subset (Smillie + Garrido carry HC; TAURUS does not
+  in v1 per PI directive).
+- `code/02_atlas_prep/README.md` (raw-counts shipper list) and
+  `hgnc_remap.py` (loader-list docstring): updated.
+- `code/_shared/canonical_broad_DRAFT.md`: 6 Mennillo → TAURUS swaps.
+
+Plus: `code/10_broad_atlas_hca/README.md` carried a **double** stale
+reference — "UC trio (Smillie 2019 / Kong 2023 / Mennillo 2024)" —
+where the "Kong 2023" should have been Garrido-Trigo per DECISIONS
+(2/7) and Mennillo should be TAURUS per (16). Both fixed in this
+sweep; was a real hardcoded operational path (the line documented
+which atlases the donor-overlap check runs against).
+
+**Remaining Mennillo references** are by design:
+
+- `DECISIONS.md` corrections (1/7) through (15) + (16): append-only
+  historical record. Each entry is accurate as of its date; the
+  swap is documented in (16)(a) and (17)(d).
+- `PLAN.md` and top-level `README.md`: per (16)'s explicit note, these
+  are manuscript-side reconciliation deferred to Muskaan's pass.
+- A handful of in-doc breadcrumbs (`# was: mennillo (superseded by
+  DECISIONS 16)`, `replaces Mennillo per DECISIONS 16`) — intentional;
+  they're the audit-trail per PI directive.
+
+### Net status from PI's critical-path read
+
+PI's framing: "all five atlases in processed/ + four GWAS munged →
+first scDRS/seismic results." On the atlas side, the only remaining
+laptop-side work was the TAURUS loader logic, which is done in (b)
+above. The actual end-to-end TAURUS run + the four GWAS munges happen
+on Hummingbird (and the SCZ download needs PGC registration started
+now per PI directive — flagged but not done in this commit, since
+registration is human-in-the-loop).
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_taurus.py` (skeleton → real loader with
+  4-stage filter, hierarchy passthrough, two-gate canonical-vocab,
+  log1p(CP10k), HGNC remap; ~450 lines).
+- `code/02_atlas_prep/atlas_schemas.md` (DOI v3; passing Mennillo
+  references → TAURUS).
+- `code/02_atlas_prep/README.md` (DOI v3; raw-counts list updated).
+- `code/02_atlas_prep/cl_rollup_maps.yaml` (mennillo → taurus).
+- `code/02_atlas_prep/hgnc_remap.py` (docstring loader-list).
+- `code/03_scdrs/README.md` (all-cells policy reflects UC-only TAURUS).
+- `code/06_concordance/{compute_concordance.py,README.md}` (examples).
+- `code/07_regime2_meta/run_brown.py` (docstring example).
+- `code/08_cross_method/README.md`, `code/09_cross_gwas/README.md`,
+  `code/10_broad_atlas_hca/README.md`,
+  `code/11_broad_atlas_pangi/README.md` (example invocations).
+- `code/_shared/canonical_broad_DRAFT.md` (5 spots).
+- `scripts/download_refs.sh` (TAURUS manual block; DOI v3 + md5).
+- `scripts/README.md` (manual-fetch list; per-atlas note).
+- `scripts/slurm/03_scdrs_compute.slurm`,
+  `scripts/slurm/04_seismic.slurm`,
+  `scripts/slurm/donor_loo_array.slurm`,
+  `scripts/slurm/test_retest_array.slurm`,
+  `scripts/slurm/README.md` (validation strings, arrays, examples).
+- `DECISIONS.md` (this entry).
+
 
 
 

@@ -24,7 +24,9 @@ bash scripts/setup_env.sh
 
 # 4. Auto-fetch what's freely downloadable; manually fetch the rest
 bash scripts/download_refs.sh
-#  Manual: Smillie / Garrido-Trigo / Mennillo / HCA Gut / Pan-GI / Liu / SCZ
+#  Manual: Smillie / Garrido-Trigo / TAURUS / HCA Gut / Pan-GI / SCZ
+#  (Liu, de Lange, Yengo are now auto-fetched per DECISIONS 14; TAURUS
+#   replaced Mennillo per DECISIONS 16.)
 #  See the printed instructions and the M1 spot-checks in PLAN.md.
 
 # 5. M1 MAGMA pipeline (3 GWAS x ~30 min each)
@@ -77,10 +79,11 @@ sbatch -p $UCC_PARTITION --account=$UCC_ACCOUNT --mail-user=$UCC_EMAIL \
   DECISIONS.md).
 - Trubetskoy 2022 SCZ sample size in `scripts/slurm/01_magma.slurm` —
   defaults to 130,635 but verify against the paper.
-- Mennillo donor count after pre-treatment subsetting — used in
-  `--array=0-N` for `donor_loo_array.slurm`. Verify ≥8 per DECISIONS.md.
-- Cell Ontology release date — record in DECISIONS.md M2 section after
-  `download_refs.sh` pulls `cl.owl`.
+- TAURUS UC donor count after subset (DECISIONS 16) — expect 22 per
+  Thomas 2024 Fig. 2b; used in `--array=0-21` for
+  `donor_loo_array.slurm`. Verify on first run of `load_taurus.py`.
+- Cell Ontology release date — **pinned 2026-03-26** per DECISIONS 13;
+  pinned term-label snapshot at `data/reference/cl_terms_pinned.tsv`.
 
 ## Smoke testing before submitting batch jobs
 

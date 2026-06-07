@@ -47,7 +47,7 @@ sbatch --export=ALL,GWAS=liu     scripts/slurm/01_magma.slurm
 sbatch --export=ALL,GWAS=scz     scripts/slurm/01_magma.slurm
 
 # 2. M3 regime-1 scDRS — 6 baseline runs (3 atlases x 2 GWAS)
-for atlas in smillie garrido_trigo mennillo; do
+for atlas in smillie garrido_trigo taurus; do
   for gwas in delange liu; do
     sbatch --export=ALL,ATLAS=$atlas,GWAS=$gwas \
            scripts/slurm/03_scdrs_compute.slurm
@@ -55,7 +55,7 @@ for atlas in smillie garrido_trigo mennillo; do
 done
 
 # 3. M3 regime-1 seismicGWAS — 6 baseline runs
-for atlas in smillie garrido_trigo mennillo; do
+for atlas in smillie garrido_trigo taurus; do
   for gwas in delange liu; do
     sbatch --export=ALL,ATLAS=$atlas,GWAS=$gwas \
            scripts/slurm/04_seismic.slurm
@@ -70,7 +70,7 @@ sbatch --export=ALL,ATLAS=smillie,GWAS=delange,GS_SUFFIX=_with_mhc \
 # per-step submission once data is in place.
 
 # 5. M3 test-retest — 3 atlases x 2 methods (de Lange only)
-for atlas in smillie garrido_trigo mennillo; do
+for atlas in smillie garrido_trigo taurus; do
   for method in scdrs seismic; do
     sbatch --export=ALL,ATLAS=$atlas,METHOD=$method \
            scripts/slurm/test_retest_array.slurm
@@ -82,13 +82,15 @@ sbatch --array=0-29 --export=ALL,ATLAS=smillie,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm
 sbatch --array=0-11 --export=ALL,ATLAS=garrido_trigo,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm
-sbatch --array=0-N  --export=ALL,ATLAS=mennillo,METHOD=scdrs \
+sbatch --array=0-21 --export=ALL,ATLAS=taurus,METHOD=scdrs \
        scripts/slurm/donor_loo_array.slurm
 # (and the seismic equivalents)
 ```
 
-Replace `0-N` with the actual Mennillo donor count after pre-treatment
-subsetting (verify ≥8 per DECISIONS.md).
+`0-21` corresponds to TAURUS's 22 UC donors post-filter (Thomas 2024
+Fig. 2b; verify on first run of `load_taurus.py`). Per DECISIONS 16,
+TAURUS-IBD supersedes the previously planned Mennillo as the third UC
+core atlas.
 
 ## Monitoring
 

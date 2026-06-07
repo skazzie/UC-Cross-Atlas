@@ -12,10 +12,10 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=amoli@ucsc.edu
 # ^^ Set the array bounds at submit time to match donor count:
-#    Smillie ~30, garrido_trigo 12, Mennillo ~10-15. Per DECISIONS.md:
+#    Smillie ~30, garrido_trigo 12, TAURUS 22 (per DECISIONS 16):
 #       --array=0-29      for Smillie
 #       --array=0-11      for garrido_trigo  (small-cohort guard applies; see below)
-#       --array=0-N       for Mennillo (verify N at M1 after subsetting)
+#       --array=0-21      for TAURUS (22 UC donors post-filter, per Thomas 2024 Fig. 2b)
 #
 # Locked scope (DECISIONS.md):
 #   - broad-tier headline metrics under de Lange only
@@ -47,7 +47,7 @@ conda activate "$UCC_CONDA_ENV"
 
 cd "$UCC_REPO"
 
-: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|taurus}"
 : "${METHOD:?set METHOD=scdrs|seismic}"
 GWAS=delange
 TIER=broad

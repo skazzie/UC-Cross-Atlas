@@ -65,10 +65,10 @@ python code/06_concordance/compute_concordance.py \
     --input \
         results/scdrs/smillie_delange_broad/UC.cell_type.tsv:smillie:scdrs:delange:broad \
         results/scdrs/garrido_trigo_delange_broad/UC.cell_type.tsv:garrido_trigo:scdrs:delange:broad \
-        results/scdrs/mennillo_delange_broad/UC.cell_type.tsv:mennillo:scdrs:delange:broad \
+        results/scdrs/taurus_delange_broad/UC.cell_type.tsv:taurus:scdrs:delange:broad \
         results/scdrs/smillie_delange_fine/UC.cell_type.tsv:smillie:scdrs:delange:fine \
         results/scdrs/garrido_trigo_delange_fine/UC.cell_type.tsv:garrido_trigo:scdrs:delange:fine \
-        results/scdrs/mennillo_delange_fine/UC.cell_type.tsv:mennillo:scdrs:delange:fine \
+        results/scdrs/taurus_delange_fine/UC.cell_type.tsv:taurus:scdrs:delange:fine \
         results/scdrs/smillie_liu_broad/UC.cell_type.tsv:smillie:scdrs:liu:broad \
         ... \
         results/seismic/smillie_delange_broad.tsv:smillie:seismic:delange:broad \

@@ -40,7 +40,7 @@ Uses the shared library in `code/06_concordance/metrics.py`.
 
 ```bash
 python code/09_cross_gwas/run_cross_gwas.py \
-    --atlases smillie garrido_trigo mennillo \
+    --atlases smillie garrido_trigo taurus \
     --methods scdrs seismic \
     --tiers broad fine \
     --scdrs-dir results/scdrs \

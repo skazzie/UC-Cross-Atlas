@@ -18,7 +18,7 @@
 # Run only on de Lange (DECISIONS.md). Submit one array per (atlas, method):
 #   sbatch --export=ALL,ATLAS=smillie,METHOD=scdrs    scripts/slurm/test_retest_array.slurm
 #   sbatch --export=ALL,ATLAS=smillie,METHOD=seismic  scripts/slurm/test_retest_array.slurm
-#   ... and similarly for garrido_trigo, mennillo.
+#   ... and similarly for garrido_trigo, taurus.
 #
 # Total: 3 atlases x 2 methods x 3 seeds = 18 runs, all under de Lange.
 
@@ -36,7 +36,7 @@ conda activate "$UCC_CONDA_ENV"
 
 cd "$UCC_REPO"
 
-: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|taurus}"
 : "${METHOD:?set METHOD=scdrs|seismic}"
 GWAS=delange
 

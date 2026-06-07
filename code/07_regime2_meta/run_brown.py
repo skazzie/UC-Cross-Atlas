@@ -4,7 +4,7 @@
 Spec: see ./README.md and DECISIONS.md.
 
 For one (method, tier, gwas), combine per-cell-type p-values across
-{smillie, garrido_trigo, mennillo} using Brown's method (Kost-McDermott
+{smillie, garrido_trigo, taurus} using Brown's method (Kost-McDermott
 analytical form), with the pairwise covariance estimated empirically
 from null draws.
 

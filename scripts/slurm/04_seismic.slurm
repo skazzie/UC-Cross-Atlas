@@ -15,7 +15,7 @@
 # seismicGWAS regime-1 pipeline — one (atlas, GWAS, tier) per task.
 #
 # Default array covers all 12 UC-trio jobs:
-#   ATLAS in {smillie, garrido_trigo, mennillo}
+#   ATLAS in {smillie, garrido_trigo, taurus}
 #   GWAS  in {delange, liu}
 #   TIER  in {broad, fine}
 #
@@ -44,7 +44,7 @@ cd "$UCC_REPO"
 
 # ---- Resolve (ATLAS, GWAS, TIER) from array index OR env -----------------
 
-ATLASES=(smillie smillie smillie smillie garrido_trigo garrido_trigo garrido_trigo garrido_trigo mennillo mennillo mennillo mennillo)
+ATLASES=(smillie smillie smillie smillie garrido_trigo garrido_trigo garrido_trigo garrido_trigo taurus taurus taurus taurus)
 GWASES=(delange  delange  liu      liu      delange       delange       liu           liu           delange  delange  liu      liu)
 TIERS=(broad     fine     broad    fine     broad         fine          broad         fine          broad    fine     broad    fine)
 
@@ -55,7 +55,7 @@ if [ -n "${SLURM_ARRAY_TASK_ID:-}" ] && [ -z "${ATLAS:-}" ]; then
     TIER="${TIERS[$IDX]}"
 fi
 
-: "${ATLAS:?set ATLAS=smillie|garrido_trigo|mennillo|hca_gut|pangi (or submit with --array=0-11)}"
+: "${ATLAS:?set ATLAS=smillie|garrido_trigo|taurus|hca_gut|pangi (or submit with --array=0-11)}"
 : "${GWAS:?set GWAS=delange|liu}"
 : "${TIER:=broad}"
 PERMUTE="${PERMUTE:-1}"

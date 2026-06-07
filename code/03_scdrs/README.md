@@ -64,8 +64,10 @@ Brown's method correlation-matrix estimation in M5.
 ## All-cells policy
 
 `compute-score` and group analysis run on **all cells** in the atlas,
-regardless of disease status. Smillie/Garrido-Trigo/Mennillo all include both UC
-and reference samples; running on the full mucosa is the right answer to
+regardless of disease status. Smillie and Garrido-Trigo include both UC
+and reference samples; TAURUS is v1-subset to UC-only (DECISIONS 16),
+contributing UC-side signal only. Running on the full mucosa within
+each atlas is the right answer to
 the biological question and is consistent with Zhang et al. 2022's
 standard practice.
 

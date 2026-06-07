@@ -8,7 +8,7 @@
 
 This document is the candidate single shared broad-tier vocabulary
 across the five UC-Cross-Atlas atlases (Smillie, Garrido-Trigo,
-Mennillo, HCA Gut, Pan-GI). It exists so the per-term Cell Ontology
+TAURUS, HCA Gut, Pan-GI). It exists so the per-term Cell Ontology
 assignments and the two outstanding biology calls (mural/glia,
 enteroendocrine/tuft) can be reviewed and red-lined **before** any
 concordance metric is computed — locking after seeing rho values would
@@ -16,7 +16,7 @@ make the regime-1-vs-2 comparison circular (fix-handoff item 4, P1).
 
 The draft is built from the only two atlases whose fine tiers are
 currently in hand (Garrido-Trigo and Smillie). HCA Gut, Pan-GI, and
-Mennillo will contribute net-new fine→canonical maps once their fine
+TAURUS will contribute net-new fine→canonical maps once their fine
 labels are enumerated on disk; per-term coverage verification (≥50
 cells per atlas where biologically expected) happens at that point.
 
@@ -122,7 +122,7 @@ chemosensory differently.
   atlases anyway.
 
 This DRAFT recommends **keep as union** pending coverage data from
-HCA/Pan-GI/Mennillo; flip to split if both can clear ≥50 cells per term
+HCA/Pan-GI/TAURUS; flip to split if both can clear ≥50 cells per term
 per atlas, otherwise the split adds a term that no atlas can populate
 densely.
 
@@ -157,12 +157,13 @@ actually needs it.
 
 ## What this DRAFT does NOT contain
 
-Deliberately deferred until HCA Gut, Pan-GI, and Mennillo are on disk
+Deliberately deferred until HCA Gut, Pan-GI, and TAURUS are on disk
 with fine tiers enumerated:
 
 - The HCA `author_cell_type` (~120 fine labels) → canonical map.
 - The Pan-GI `level_3_annot` (~70 fine labels) → canonical map.
-- The Mennillo fine-tier → canonical map (loader still skeleton).
+- The TAURUS fine-tier → canonical map (loader skeleton in place per
+  DECISIONS 16; LOW_TO_BROAD empty, populates on first run).
 - Per-term, per-atlas coverage table (cell counts; ≥50-cell gate
   flagged per term per atlas; structural zeros documented explicitly).
 - Per-atlas "canonical term this atlas cannot populate" log lines in
@@ -179,7 +180,7 @@ with fine tiers enumerated:
 ## Sequencing for the lock
 
 1. Process the three remaining atlases (Smillie compute-node run;
-   Garrido RAW.tar rewrite per correction 9; Mennillo implementation;
+   Garrido RAW.tar rewrite per correction 9 [DONE]; TAURUS implementation;
    HCA + Pan-GI already production loaders, no rewrite needed).
 2. Enumerate fine labels from HCA `author_cell_type` and Pan-GI
    `level_3_annot` against the candidate vocabulary; build the two

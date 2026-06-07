@@ -5,7 +5,8 @@ substitution test using HCA Gut Cell Atlas (Elmentaite 2021), restricted
 to the large-intestine subset.
 
 **Role:** independent broad comparator. M1 must verify zero donor overlap
-with the UC trio (Smillie 2019 / Kong 2023 / Mennillo 2024). If overlap
+with the UC trio (Smillie 2019 / Garrido-Trigo 2023 / TAURUS 2024 per
+DECISIONS 2/7 and 16). If overlap
 exists, HCA Gut becomes a second integration-pipeline-robustness comparator
 (not an independent comparator) and the framing in §2.4.3 of the plan
 changes accordingly.
@@ -76,7 +77,7 @@ abundance from HCA Gut in figures.
 python code/10_broad_atlas_hca/run_hca_comparison.py \
     --hca-results-base results/hca_gut \
     --hca-no-crohn-base results/hca_gut_no_crohn \
-    --uc-atlases smillie garrido_trigo mennillo \
+    --uc-atlases smillie garrido_trigo taurus \
     --gwas delange liu \
     --methods scdrs seismic \
     --tiers broad fine \
