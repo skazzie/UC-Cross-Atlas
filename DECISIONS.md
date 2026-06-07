@@ -944,4 +944,119 @@ Files updated in this batch:
   matches actual behavior)
 - `DECISIONS.md` (this entry)
 
+---
+
+## CORRECTION 2026-06-06 (12): Garrido-Trigo RAW.tar loader shipped — implements (9)
+
+Correction (9) committed to rewriting `load_garrido_trigo.py` against
+`GSE214695_RAW.tar` (real 10X barcodes preserved) once that archive was
+on disk and the schema captured. The archive landed at
+`~/Downloads/GSE214695_RAW.tar` (887 MB, downloaded 2026-06-06), schema
+was captured against the actual bytes, and the loader was written and
+**verified end-to-end** against the local RAW.tar + CSV.
+
+### Verification facts (from the local run)
+
+End-to-end load produced **30,068 cells × 22,414 genes across 12
+donors**, with all hard gates passing on the first complete run after
+the typo fix below:
+
+- Cell count = 30,068 — **exact** match to (2/7) expected; soft
+  tripwire silent.
+- Donor structure = 6 HC + 6 UC = 12 — hard donor invariant passes.
+- Per-donor cell counts match the prior CELLxGENE deposit's HC_*/UC_*
+  counts to the cell (HC_1: 1531, HC_6: 1898, UC_6: 2965, …).
+  Independent confirmation that the RAW.tar path reproduces the same
+  cohort as the (correction-9-superseded) CELLxGENE path, just with
+  joinable barcodes.
+- Disease vs sample-prefix cross-check: agree on all 30,068 cells.
+- Annotation completeness: zero NaN `cell_type_fine` post-join.
+- Fine labels: 86 surviving (post-Ribhi-collapse). Arithmetic
+  corrected from the (8) entry's "82": 91 published − 9 Ribhi-named +
+  4 generic parents introduced by the collapse (`epithelial`, `T`,
+  `fibroblast`, `mast`, none of which were standalone labels in the
+  original 91). The old "82" was a hand calculation that never ran.
+- Broad labels: 15 — within the 10–15 v1 target.
+- Canonical UC GWAS hits: **5/5 survive** the (11) pinned-HGNC remap
+  (IL23R, JAK2, TYK2, NKX2-3, ATG16L1).
+- X = log1p(CP10k) float32, max 9.14 (sensible log range); raw counts
+  preserved in `layers['counts']`, max UMI 58,069.
+
+### Loader architecture
+
+- Reads the 18 per-GSM 10X triplets in-memory via `tarfile` +
+  `gzip.GzipFile` + `scipy.io.mmread` — no tar extraction step.
+- CD-1..CD-6 GSMs are dropped at the **glob step** (saves ~30 MB ×
+  6 sparse matrices vs. load-then-filter).
+- Each per-GSM AnnData carries `obs.index = f"{sample}_{barcode}"`
+  (e.g. `"HC1_AAACCTGCAAGTCTGT-1"`), built so the composite is unique
+  on the RAW side by construction.
+- CSV side is filtered to the same sample-prefix subset
+  (`("HC", "UC")` for v1), then composite-keyed by
+  `f"{sample}_{cell_id}"`, then dup-checked. Inner-join collapses the
+  ~99.8% empty droplets in the raw 10X whitelist down to the 30,068
+  CSV-annotated cells.
+- The seven `_try_join_keys` strategies from the pre-correction-9
+  loader are gone — when we control matrix assembly, there's exactly
+  one deterministic join key on each side.
+- Three sample-naming conventions reconciled on load: RAW dashed
+  (`HC-1`), CSV no-separator (`HC1`), CELLxGENE-deposit underscore
+  (`HC_1`). The loader emits the underscore form in `obs['donor_id']`
+  to preserve continuity with the pre-correction-9 obs schema.
+- `log1p(CP10k)` applied on load (the RAW.tar matrices are raw int
+  counts); raw preserved in `layers['counts']`; `raw_count_mode=True`
+  remains unsupported per (5/7).
+- The full assert pattern from (9)'s plan is in place — completeness,
+  donor structure (hard), disease/sample agreement (hard), unmapped
+  fine labels (hard), broad cardinality (warning), cell count
+  (warning tripwire).
+
+### Side-findings logged (not corrections of their own; documented here)
+
+1. **CSV CD-only duplicate composites (Salas-lab authoring bug).** The
+   GEO CSV has 2 duplicate `(sample, cell_id)` composites, all in CD3,
+   each pair carrying conflicting fine annotations
+   (`Cycling cells` vs `Cycling myeloid`;
+   `Epithelium Ribhi` vs `M0_Ribhi`). Traced to inconsistent
+   whitespace in `Unnamed: 0` (`SC_013_GTGTGGCAGACTACCT-1` vs
+   `SC_013 _ GTGTGGCAGACTACCT-1` etc.) — the same cell got annotated
+   twice in two CSV authoring passes. None affect the v1 HC+UC cohort.
+   The loader filters CSV to the v1 sample prefixes **before** the
+   duplicate gate, so the bug is structurally outside our cohort. If
+   the gate ever fires on HC/UC, that's a new defect to inspect.
+2. **`FINE_TO_BROAD` typo fix (`Perycites` → `Pericytes`).** The map
+   had `"Perycites"` (with a `y`); the actual published label is
+   `"Pericytes"`. Pre-existing bug in the (8) version of the map; the
+   CELLxGENE-path loader never reached the unmapped-fine-labels check
+   because it failed earlier at the barcode join, so the typo never
+   fired. Caught immediately on the first RAW.tar run; one-character fix.
+3. **Mixed 10X chemistry in the deposit.** HC-1 ships the v2 whitelist
+   (737,280 barcodes); HC-2..UC-6 ship the v3 whitelist (6,794,880
+   barcodes). Same gene reference across all (CellRanger 3.0.2,
+   33,538 features), so concat is uniform and the post-CSV cell set
+   is unaffected. Documented in `atlas_schemas.md` for context but
+   not a downstream concern.
+
+### Promoted: README + atlas_schemas
+
+The README loader-status table flips Garrido-Trigo from "Superseded —
+RAW.tar rewrite pending (correction 9)" back to **Production**. The
+`atlas_schemas.md` garrido_trigo section is rewritten as a captured
+schema for the RAW.tar layout (matrix source, on-disk layout, filter
+chain, tier arithmetic explaining 86 vs the old 82) — the
+correction-9 "changing" banner is gone.
+
+Files updated in this batch:
+
+- `code/02_atlas_prep/load_garrido_trigo.py` (full rewrite against
+  RAW.tar; `_try_join_keys` and the CELLxGENE deposit machinery gone;
+  `_group_tar_entries`, `_read_triplet_from_tar`, `_load_per_gsm`
+  added; `Pericytes` typo fix)
+- `code/02_atlas_prep/atlas_schemas.md` (garrido_trigo section
+  rewritten for RAW.tar schema; correction-9 banner removed)
+- `code/02_atlas_prep/README.md` (loader-status table: Garrido-Trigo →
+  Production)
+- `DECISIONS.md` (this entry)
+
+
 

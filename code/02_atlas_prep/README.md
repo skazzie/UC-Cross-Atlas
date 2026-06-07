@@ -99,7 +99,7 @@ locked policy.
 
 | Script | Atlas | Status | Filter chain |
 |--------|-------|--------|--------------|
-| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | **Superseded** — RAW.tar rewrite pending (correction 9) | `disease in {normal, ulcerative colitis}`; was joining GEO `GSE214695_cell_annotation.csv` onto the CELLxGENE matrix by barcode, but the deposit's `obs.index` is synthetic (`cell1, cell2, ...`) so the barcode join cannot succeed. v1 will load the matrix from `GSE214695_RAW.tar` (barcodes intact) and join on `Unnamed: 0`; `log1p(CP10k)` applied on load. |
+| `load_garrido_trigo.py` | Garrido-Trigo 2023 (UC core) | Production | 12 HC/UC GSMs from `GSE214695_RAW.tar` (CD skipped at glob); composite inner-join `{sample}_{barcode}` against `GSE214695_cell_annotation.csv`; `log1p(CP10k)` applied on load (raw in `layers['counts']`); 86 fine (post-Ribhi) → 15 broad; verified 30,068 cells / 12 donors end-to-end. See DECISIONS corrections (9), (12). |
 | `load_pangi.py` | Pan-GI Extended+ (broad comparator) | Production | UC + IBD diseases x colon organs x non-organ-donor |
 | `load_hca_gut.py` | HCA Gut / Elmentaite 2021 (broad reference) | Production | `Age_group in {Adult, Adult_MLN}` x colon tissues |
 | `load_smillie.py` | Smillie 2019 (UC core) | Loader complete; first compute-node run pending | 30 donors (12 HC + 18 UC paired); `Health` 3-state preserved (`obs['health']`); harmonized 2-state `disease` via `HEALTH_TO_DISEASE`; `log1p(CP10k)` applied on load (raw in `layers['counts']`); 51 fine → 14 broad. See DECISIONS correction 10. |

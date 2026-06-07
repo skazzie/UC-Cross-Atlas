@@ -10,54 +10,99 @@ Schema captured 2026-05-20.
 
 ## garrido_trigo
 
-> **Matrix source is changing (DECISIONS correction 9, 2026-06-04).** The
-> CELLxGENE deposit's `obs.index` is synthetic (`cell1, cell2, ...`) — the
-> 10X barcodes are stripped, so the GEO annotation cannot be joined onto
-> it deterministically. v1 moves to `GSE214695_RAW.tar` per-GSM matrices,
-> where barcodes are intact and the CSV's `Unnamed: 0` (`SC_xxx_<barcode>`)
-> is the unique join key. This section still documents the
-> pre-correction-9 schema; it will be rewritten when the RAW.tar loader
-> lands (next session, alongside Smillie SCP259). Per-donor cell counts
-> (n_cells, n_donors below) carry over unchanged because they're fixed by
-> the study design.
+Schema captured 2026-06-06 from the GEO RAW.tar deposit. Implements
+DECISIONS correction (9): matrix source is GEO `GSE214695_RAW.tar`
+(real 10X barcodes preserved), NOT the CELLxGENE deposit (synthetic
+obs.index, barcodes stripped at deposit time). The end-to-end loader
+run against `GSE214695_RAW.tar` + `GSE214695_cell_annotation.csv`
+produces 30,068 HC+UC cells across 12 donors (6 HC + 6 UC), exact
+match to the (2/7) expected count.
 
-- **Matrix source**: CELLxGENE (superseded — moving to GEO `GSE214695_RAW.tar`)
-- **Matrix download URL**: https://datasets.cellxgene.cziscience.com/b1a62801-f509-45f8-b55f-533fbb7e7800.h5ad
-- **Matrix file size**: 176 MB
-- **Annotation source**: GEO GSE214695 supplementary file
-  `GSE214695_cell_annotation.csv` (Salas-lab 91-cluster fine labels;
-  NOT present in the CELLxGENE deposit — see DECISIONS.md correction
-  reversing (4/7), and correction (9) superseding the matrix source)
-- **n_cells**: 46,700 (full deposit) / 30,068 (UC subset HC + UC)
-- **n_donors**: 18 (full) / 12 (UC subset: HC_1-6 + UC_1-6)
-- **Assay**: 10x 3' v3
+- **Matrix source**: GEO `GSE214695_RAW.tar`
+- **Matrix download URL**: https://ftp.ncbi.nlm.nih.gov/geo/series/GSE214nnn/GSE214695/suppl/GSE214695_RAW.tar
+- **Matrix file size**: 887 MB (tar; 18 per-GSM 10X triplets inside)
+- **On-disk location**: `~/uc-cross-atlas-data/atlases/GSE214695/` on
+  Hummingbird (planned); `~/Downloads/GSE214695_RAW.tar` on the dev
+  laptop where the loader was verified
+- **Annotation source**: GEO supplementary
+  `GSE214695_cell_annotation.csv` (Salas-lab 91-cluster fine labels +
+  sample column). See DECISIONS corrections reversing (4/7), (8), (9),
+  and (12).
+- **n_cells**: 30,068 (HC+UC, post-CSV inner-join, matches (2/7) exactly)
+- **n_donors**: 12 (HC_1-6 + UC_1-6); CD-1..CD-6 are skipped at the
+  glob step
+- **Assay**: 10x 3' (mixed v2 + v3 chemistry within the deposit — HC-1
+  ships the v2 whitelist of 737,280 barcodes, HC-2..UC-6 ship the v3
+  whitelist of 6,794,880 barcodes; CellRanger 3.0.2 in both cases with
+  the same 33,538-feature reference, so concat is uniform)
 
-### Filter chain (UC subset)
+### On-disk layout (within the tar)
 
-```python
-adata = adata[adata.obs["disease"].isin(["normal", "ulcerative colitis"])]
-```
+18 per-GSM 10X triplets, flat at the tar root (no sub-directories).
+Filenames follow `GSM{nnnnnnn}_{HC|UC|CD}-{n}_{kind}.{mtx|tsv}.gz`,
+e.g. `GSM6614348_HC-1_matrix.mtx.gz`. The loader globs by this regex
+(`code/02_atlas_prep/load_garrido_trigo.py:_TAR_ENTRY_RE`) and reads
+all three files per GSM in-memory via `tarfile` + `gzip` — no
+extraction step.
+
+- `matrix.mtx.gz`: MatrixMarket `coordinate integer general` (raw int
+  counts); shape is genes × cells (gene-sorted). The loader transposes
+  to cells × genes before assembling the per-GSM AnnData.
+- `barcodes.tsv.gz`: bare 10X barcodes with `-1` suffix
+  (`AAACCTGAGAAACCAT-1`); the full chemistry whitelist, mostly empty
+  droplets. The inner-join against the CSV drops ~99.8% as empty / QC-
+  rejected.
+- `features.tsv.gz`: **3-column** 10X v3 format — `ensembl_id`,
+  `hgnc_symbol`, `feature_type`. The loader sets `var_names` =
+  `ensembl_id` and `var['feature_name']` = `hgnc_symbol`, so the final
+  `ensembl_to_hgnc` step takes its preferred `feature_name` path.
+
+### Filter chain (v1 UC subset)
+
+1. **Glob-time:** keep GSMs whose sample prefix is in `("HC", "UC")`
+   (drop the 6 CD GSMs at the tar enumeration step; saves loading 6 ×
+   ~30 MB sparse matrices).
+2. **Annotation CSV pre-filter:** restrict CSV rows to the same
+   `("HC", "UC")` prefix set before the duplicate-key check. The CSV
+   has 4 known CD-only duplicate rows (Salas-lab authoring artifact:
+   inconsistent whitespace in `Unnamed: 0` such as `SC_013_...` vs
+   `SC_013 _ ...`, with conflicting fine annotations); these are
+   structurally outside our cohort and would otherwise crash the gate
+   on rows we never load.
+3. **Composite inner-join:** RAW side `{sample}_{barcode}` against
+   CSV side `{sample}_{cell_id}`, where `sample` is normalized to
+   the no-separator form (`HC1`, `UC1`) used by the CSV. Drops empty
+   droplets and unannotated barcodes; lands at 30,068 cells.
+4. **Disease/sample-prefix cross-check:** the per-GSM `disease` set
+   from the filename prefix must agree with the CSV's `sample` prefix
+   for every cell. Hard-raises on disagreement.
+
+The seven barcode-join strategies from the pre-correction-9 loader
+(`_try_join_keys`) are gone — when we control matrix assembly from
+RAW.tar, the composite is unique on both sides by construction.
 
 ### Tiers
 
-Both tiers are populated by joining the GEO annotation CSV onto the
-CELLxGENE matrix by barcode (auto-detected join key; loader raises a
-diagnostic error if any cell is orphaned).
+Both tiers come from the CSV `annotation` column via the composite
+inner-join.
 
-- **fine_tier**: 82 surviving labels (91 published - 9 Ribhi collapsed
-  into parent lineage). Stored in `obs['cell_type_fine']`. Hyper-specific
-  states (PC IgA heat shock 1/2, M1 ACOD1, etc.) won't map cleanly to
-  Smillie/Mennillo; the cross-atlas fine intersection is expected to be
-  modest — do not oversell "91-way fine concordance."
-- **broad_tier**: 15-level roll-up of the surviving fine labels via
-  `FINE_TO_BROAD` in `load_garrido_trigo.py`. Stored in
-  `obs['cell_type_broad']`. Levels: colonocyte, goblet,
-  epithelial progenitor, enteroendocrine/tuft, fibroblast, endothelium,
-  mural/glia, T cell, NK/ILC, B cell, plasma cell, monocyte/macrophage,
-  dendritic cell, mast cell, granulocyte.
-- **CELLxGENE `obs['cell_type']` (5 CL lineages)** is NOT used for tier
-  output; the loader uses the GEO annotation as the source of truth.
-  Useful only as a coherence cross-check.
+- **fine_tier**: **86 labels post-Ribhi-collapse**. Arithmetic: 91
+  published labels − 9 Ribhi-named labels (collapsed into parent
+  lineage) + 4 generic parents introduced by the collapse
+  (`epithelial`, `T`, `fibroblast`, `mast` — none of which appear as
+  standalone fine clusters in the original 91). Stored in
+  `obs['cell_type_fine']`. Hyper-specific states (PC IgA heat shock
+  1/2, M1 ACOD1, etc.) won't map cleanly to Smillie/Mennillo; the
+  cross-atlas fine intersection is expected to be modest — do not
+  oversell "91-way fine concordance."
+- **broad_tier**: 15-level roll-up via `FINE_TO_BROAD` in
+  `load_garrido_trigo.py`. Stored in `obs['cell_type_broad']`. Levels:
+  colonocyte, goblet, epithelial progenitor, enteroendocrine/tuft,
+  fibroblast, endothelium, mural/glia, T cell, NK/ILC, B cell, plasma
+  cell, monocyte/macrophage, dendritic cell, mast cell, granulocyte.
+  Note: `canonical_broad_DRAFT.md` proposes a mural/glia split
+  (pericyte → fibroblast, glia → own term) — pending red-line; not yet
+  applied in this loader's map.
 
 ### Ribhi collapse policy
 
@@ -99,13 +144,18 @@ the marker xlsx and the annotation CSV.
 
 ### Counts
 
-- `X`: log-normalized float32 (CELLxGENE)
-- `raw`: NOT PRESENT (use `--flag-raw-count False`)
-- `var_names`: Ensembl IDs (HGNC symbols in `var['feature_name']`)
-- **Do NOT switch `--flag-raw-count True` for Garrido-Trigo** even though
-  the GEO RAW.tar matrices have true integer counts; uniform
-  `--flag-raw-count False` across atlases preserves cross-atlas input
-  comparability (DECISIONS.md correction 5/7).
+- `X`: **log1p(CP10k) float32**, computed by the loader on read from the
+  RAW.tar integer counts. Uniform input state across atlases (same
+  treatment Smillie and Mennillo get; CELLxGENE-sourced HCA/Pan-GI
+  already ship in this form).
+- `layers['counts']`: raw integer counts preserved from the RAW.tar
+  MatrixMarket files.
+- `var_names`: HGNC symbols (after `ensembl_to_hgnc`). Input was
+  Ensembl IDs (column 1 of `features.tsv.gz`) with HGNC symbol in
+  `var['feature_name']` (column 2).
+- `--flag-raw-count` stays uniformly `False` across all five atlases
+  (DECISIONS correction 5/7). The loader does the CP10k+log1p on the
+  Garrido side rather than handing raw counts to downstream scDRS.
 
 ### Markers reference
 
