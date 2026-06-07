@@ -1,0 +1,37 @@
+# Cell Ontology term labels pinned to release 2026-03-26
+# Source: http://purl.obolibrary.org/obo/cl.owl
+# versionIRI: http://purl.obolibrary.org/obo/cl/releases/2026-03-26/cl.owl
+# Generated 2026-06-06 via xml.etree.ElementTree parse of the OWL.
+# Refresh: re-download cl.owl, re-run the extractor (this comment block names it),
+# update both this file and the DECISIONS CL pin entry.
+#
+# Mismatches in 'matches_draft' = 'no' are ERRORS in canonical_broad_DRAFT.md
+# (not the ontology), and must be resolved before the DRAFT is promoted.
+cl_id	label_in_2026-03-26	draft_expected	matches_draft
+CL:1000347	colonocyte	enterocyte of colon	no
+CL:0011108	colon epithelial cell	colon epithelial cell	yes
+CL:0000160	goblet cell	goblet cell	yes
+CL:1000320	large intestine goblet cell	large intestine goblet cell	yes
+CL:0000164	enteroendocrine cell	enteroendocrine cell	yes
+CL:0002204	tuft cell	brush cell of intestine / tuft	no
+CL:0002250	intestinal crypt stem cell	intestinal crypt stem cell	yes
+CL:1000280	smooth muscle cell of colon	stem cell of intestine	no
+CL:0009039	colon goblet cell	colon epithelial progenitor cell	no
+CL:0000057	fibroblast	fibroblast	yes
+CL:0000669	pericyte	pericyte	yes
+CL:0000115	endothelial cell	endothelial cell	yes
+CL:0002138	endothelial cell of lymphatic vessel	lymphatic endothelial cell	no
+CL:0002073	transitional myocyte	enteric glial cell (draft assumed)	no
+CL:0000125	glial cell	glial cell	yes
+CL:0000084	T cell	T cell	yes
+CL:0000623	natural killer cell	natural killer cell	yes
+CL:0001065	innate lymphoid cell	innate lymphoid cell	yes
+CL:0000236	B cell	B cell	yes
+CL:0000786	plasma cell	plasma cell	yes
+CL:0000576	monocyte	monocyte	yes
+CL:0000235	macrophage	macrophage	yes
+CL:0000451	dendritic cell	dendritic cell	yes
+CL:0000097	mast cell	mast cell	yes
+CL:0000094	granulocyte	granulocyte	yes
+CL:0000775	neutrophil	neutrophil	yes
+CL:0000771	eosinophil	eosinophil	yes

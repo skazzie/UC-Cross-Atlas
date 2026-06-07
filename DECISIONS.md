@@ -1058,5 +1058,183 @@ Files updated in this batch:
   Production)
 - `DECISIONS.md` (this entry)
 
+---
+
+## CORRECTION 2026-06-06 (13): Cell Ontology pin — release 2026-03-26
+
+`canonical_broad_DRAFT.md` references ~27 CL IDs as the substrate of the
+candidate broad-tier vocabulary. Cell Ontology is updated externally
+(monthly-ish), so without a pin those IDs can silently shift meaning
+between runs — same shape as the (11) gene_info issue.
+
+**Pin.**
+
+- **Release date:** 2026-03-26
+- **versionIRI:** `http://purl.obolibrary.org/obo/cl/releases/2026-03-26/cl.owl`
+- **Source URL:** `http://purl.obolibrary.org/obo/cl.owl`
+- **File size:** 62.82 MB
+- **Pinned term list (committed):**
+  `data/reference/cl_terms_pinned.tsv` — 27 rows, one per CL ID
+  referenced in `canonical_broad_DRAFT.md`, with the **label as it
+  appeared in 2026-03-26** alongside the draft-expected label and a
+  match flag. Refresh procedure documented in the TSV header.
+
+The OWL file itself is **not** committed (63 MB; re-downloadable from
+the URL above; pinning the term list is sufficient for our use). The
+gene_info pattern of committing the dump was justified because the
+remap reads the bytes at runtime; the CL pin only needs the term-list
+snapshot, not the live OWL.
+
+**Six DRAFT errors surfaced by the pin** (the whole point of pinning):
+
+- Label drift (concept correct, label updated upstream): CL:1000347
+  *colonocyte* (was "enterocyte of colon"); CL:0002204 *tuft cell*
+  (was "brush cell of intestine / tuft"); CL:0002138 *endothelial cell
+  of lymphatic vessel* (was "lymphatic endothelial cell").
+- **WRONG CL ID** (the drafted ID points at a different concept in
+  2026-03-26):
+  - CL:1000280 → in this release is "smooth muscle cell of colon",
+    NOT "stem cell of intestine".
+  - CL:0009039 → in this release is "colon goblet cell", NOT "colon
+    epithelial progenitor cell".
+  - CL:0002073 → in this release is "transitional myocyte", NOT
+    "enteric glial cell".
+
+Reverse-lookup of the drafted concept names also failed for `enteric
+glial cell`, `enterocyte of colon` (now "colonocyte"), `brush cell of
+intestine`, `stem cell of intestine`, `colon epithelial progenitor
+cell`, and `lymphatic endothelial cell` — the three WRONG-ID rows need
+actual ontology investigation (which CL term, if any, captures the
+intended biology), not a trivial relabel. Documented inline in
+`canonical_broad_DRAFT.md` and flagged with `[CL ID UNRESOLVED —
+pin verification]` so they cannot be silently promoted into a locked
+`CANONICAL_BROAD`.
+
+Files updated:
+
+- `data/reference/cl_terms_pinned.tsv` (new; 27 rows; the actual pin)
+- `code/_shared/canonical_broad_DRAFT.md` (CL pin section + inline
+  flags on the six affected rows)
+- `DECISIONS.md` (this entry)
+
+---
+
+## CORRECTION 2026-06-06 (14): GWAS sumstats — accessions, schemas, fixed-N
+
+The to-do PDF flagged "Liu's per-SNP N column" and "which de Lange
+accession is the UC arm." Resolved both by HEAD-checking the GWAS
+Catalog FTP listings and range-fetching the first ~1 MB of each
+sumstats file. The accession ambiguity is settled and Liu's N
+fallback is documented; the cross-GWAS effective-N range is also now
+on the record.
+
+**Locked accessions and schemas (captured 2026-06-06):**
+
+| Study | Accession | Cases / controls | Build | Per-SNP N |
+|---|---|---|---|---|
+| de Lange 2017 UC | **GCST004133** | 12,366 / 33,609 EUR | 37 | **NO — fixed 45,975** |
+| Liu 2023 UC (multi-ancestry) | **GCST90446794** | (6,862 EA + 16,390 EUR) / (15,456 EA + 336,800 EUR) | 38 | **NO — fixed 375,508** |
+| Yengo 2022 height EUR | **GCST90245992** | 1,597,374 EUR | 37 | **YES — `n` column** |
+| Trubetskoy 2022 SCZ | GCST90128471 | 53,386 EUR + 14,004 EAS + 6,152 AA + 1,234 Latino cases | — | full sumstats not on GWAS Catalog; PGC-only |
+
+**Critical accession correction.** Saisohan's `download_refs.sh`
+previously labeled GCST004131 as the de Lange UC sumstats. **That is
+wrong.** Per the GWAS Catalog REST API (PMID 28067908), the three de
+Lange 2017 studies are:
+
+- GCST004131 = **IBD overall** (25,042 / 34,915)
+- GCST004132 = **Crohn's disease** (12,194 / 28,072)
+- GCST004133 = **Ulcerative colitis** (12,366 / 33,609) ← the v1 UC arm
+
+Using GCST004131 would have silently munged IBD-combined sumstats as
+"UC" — exactly the phenotype confound the to-do PDF flagged. Script
+fixed in this commit; the UC file is
+`uc_build37_45975_20161107.txt.gz` (the "45975" in the filename =
+total samples = 12,366 + 33,609, which is the empirical confirmation
+of the accession).
+
+**Per-SNP N — Liu and de Lange need fixed-N fallback.** Liu's
+GCST90446794 ships `chromosome, base_pair_location, effect_allele,
+other_allele, beta, standard_error, effect_allele_frequency, p_value,
+variant_id, FreqSE, MinFreq, MaxFreq, Direction, HetISq, HetChiSq,
+HetDf, HetPVal` — no N column. De Lange GCST004133 ships `MarkerName,
+Allele1, Allele2, Effect, StdErr, P.value, Direction, HetISq, HetChiSq,
+HetDf, HetPVal, Pval_IBDseq, Pval_IIBDGC, Pval_GWAS3,
+Min_single_cohort_pval` — no N column either. **Fixed-N for MAGMA**:
+de Lange UC = 45,975; Liu UC = 375,508. Yengo's `n` column is the
+canonical per-SNP N (varies 85k–615k).
+
+**Cross-GWAS effective-N range** (settles the Li 2025 sample-size
+confound concern from your notes): 46k (de Lange) / 376k (Liu) / 1.6M
+(Yengo) — three orders of magnitude. The magnitude-of-N variation is
+the *expected* explanation for differential power across the three;
+seismic + scDRS treatment of this needs to be deliberate, not assumed
+neutral. Method-side handling logged separately when MAGMA-munged
+files exist.
+
+`scripts/download_refs.sh` updated:
+
+- de Lange URL fixed (GCST004131 → GCST004133); script auto-fetches.
+- Liu UC URL added (auto-fetch).
+- Yengo height EUR URL added (auto-fetch).
+- Trubetskoy SCZ stays manual (PGC, registration). Saisohan's link
+  is unchanged; added a note explaining why it isn't a GWAS Catalog
+  download.
+- Per-SNP N status documented in the post-download notes.
+
+Files updated:
+
+- `scripts/download_refs.sh` (de Lange accession correction; Liu and
+  Yengo URLs added; Trubetskoy/PGC note clarified; per-SNP N status
+  in the post-download notes)
+- `DECISIONS.md` (this entry)
+
+λ_GC and any other munged-stats observations wait until the files are
+actually staged into `~/uc-cross-atlas-data/gwas/` and `1_magma.slurm`
+has run on them.
+
+---
+
+## CORRECTION 2026-06-06 (15): Mennillo accession — GSE229072 is wrong, correct ID unconfirmed
+
+The original to-do PDF said "Download Mennillo from GEO (GSE229072 —
+verify accession on the page)". Verification (this session,
+2026-06-06): **GSE229072 is not Mennillo.**
+
+- **Actual GSE229072:** "Arginine methylation of C/EBPα controls the
+  speed of immune cell transdifferentiation (ChIP-Seq)" — Garcia,
+  Leutz, Graf et al., 2023. Mouse, B-cell→macrophage transdifferen-
+  tiation, 8 ChIP-Seq samples. **Wrong organism, wrong assay, wrong
+  trait.**
+
+The actual Mennillo et al. 2024 paper is "Single-cell and spatial
+multi-omics highlight effects of anti-integrin therapy across cellular
+compartments in ulcerative colitis" (*Nat Commun* 15:1493,
+doi:10.1038/s41467-024-45665-6, PMC10876948). Confirmed by web search.
+The correct GEO accession could not be auto-confirmed this session —
+the Nature Communications full-text fetch returned 403 (bot block) and
+PMC's data-availability snippet was truncated and surfaced only an
+external validation dataset (GSE73661 — *Smillie 2019 prequel*, also
+not Mennillo's primary deposit).
+
+**Action for next session** (needs a human-driven browser fetch):
+open the Nat Comms paper or its bioRxiv version
+(`https://www.biorxiv.org/content/10.1101/2023.01.21.525036v3.full`)
+and read the Data Availability section. The Mennillo primary
+single-cell data lives at a GSE accession that begins with GSE2xxxxx
+(submitted in 2023–2024). Once confirmed, update:
+
+- `code/02_atlas_prep/load_mennillo.py` (currently `NotImplementedError`)
+- `code/02_atlas_prep/README.md` Atlases list (item 3, "verify GEO
+  accession at M1")
+- `scripts/download_refs.sh` if the deposit is publicly downloadable
+  without registration
+
+Until then, the Mennillo loader stays a skeleton and the v1 UC trio
+remains Smillie + Garrido-Trigo with Mennillo deferred to M2.
+
+No files updated by this correction (negative-finding record only).
+
+
 
 

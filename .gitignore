@@ -243,6 +243,9 @@ data/reference/*.tsv.gz
 # Pinned exception: HGNC gene_info snapshot is committed for byte-reproducible
 # remap (see code/02_atlas_prep/hgnc_remap.py and DECISIONS correction 11).
 !data/reference/gene_info.tsv.gz
+# Pinned exception: Cell Ontology term-label snapshot is committed for the
+# canonical broad-tier vocabulary (DECISIONS correction 13).
+!data/reference/cl_terms_pinned.tsv
 
 # Generated results — ignore everything inside but keep the folder
 results/*
