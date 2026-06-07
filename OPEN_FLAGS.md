@@ -8,7 +8,7 @@ _Last updated: June 7, 2026._
 
 ---
 
-## ~~F1 · UC tissue definition — inflamed vs non-inflamed~~ — RESOLVED 2026-06-07 (DECISIONS 26)
+## ~~F1 · UC tissue definition — inflamed vs non-inflamed~~ — RESOLVED 2026-06-07 (DECISIONS 26, 27(b))
 Locked: **pool all UC cells for the first 3×3 broad heatmap** (inflamed
 + non-inflamed combined as one "UC" group). Inflamed-vs-non-inflamed
 stratification is a **Phase-9 sensitivity panel**, not a v1-figure
@@ -18,6 +18,20 @@ non-inflamed biopsies per the rev2 PDF cohort breakdown (39 inflamed
 + 13 non-inflamed of the 52 baseline samples). Loaders already capture
 the inflammation state in obs (`health` / `inflammation_score`), so
 the Phase-9 split is a downstream subset, no re-load needed.
+
+**Interpretation caveat (DECISIONS 27(b)):** "pool all" does NOT
+equalize inflammation *composition* across atlases. Garrido is
+all-inflamed by cohort design (Salas-lab biopsied inflamed mucosa
+only); Smillie and TAURUS pool inflamed + non-inflamed. So in the
+first 3×3 heatmap, the Garrido row's UC group is structurally an
+inflamed-only sample, while the Smillie and TAURUS rows mix the two
+states. Any **Garrido-row deviation** in the broad heatmap could
+therefore be inflammation composition rather than a cross-atlas
+reproducibility failure — must be carried as an interpretation caveat
+in the result paragraph. Phase-9 only restores this asymmetry: Garrido
+can feed the inflamed stratum but cannot contribute a non-inflamed
+arm, so the Phase-9 inflamed-only sub-figure is the apples-to-apples
+3×3 the pooled v1 figure is not.
 
 ## ~~F2 · Garrido QC-state labels (MT / heat-shock / IER)~~ — RESOLVED 2026-06-07 (DECISIONS 22)
 Resolved as a cross-atlas `QC_STATE_TO_PARENT` collapse policy in
