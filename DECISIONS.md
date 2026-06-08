@@ -2808,6 +2808,129 @@ Files updated in this batch:
 `code/01_magma/prepare_gwas.py` not touched in this batch — the
 (26) patch was already correct; only the invocation N changed.
 
+---
+
+## CORRECTION 2026-06-07 (28): SCZ negative control acquired; references pre-staged
+
+Per Saisohan: SCZ is off the first-figure path but the only GWAS file
+fully in our hands; references download is the "fixed URLs verify"
+two-bird check from DO NOW #2. Both executed.
+
+### (a) `prepare_gwas.py` — `--skip-comments` for PGC sumstats VCF v1.0.
+
+Trubetskoy SCZ ships in PGC's `*.vcf.tsv.gz` format: a TSV body
+prefixed by 73 `##` metadata lines (fileformat, methodsParagraph,
+acknowledgments with accented author names, contig lengths, etc.).
+`pd.read_csv(comment='#')` would eat both the metadata AND the column
+header in one undifferentiated swoop; the right move is to count the
+`##` prefix and `skiprows=` to land on the header line.
+
+Patch: new `--skip-comments` flag (action='store_true'). When set:
+
+- Pre-scan the input file, count leading `##` lines.
+- Pass the count to `pd.read_csv(skiprows=...)`.
+- If the resulting header's first column starts with `#` (some PGC
+  files do this), strip the single `#`. Trubetskoy's deposit does
+  NOT (header reads `CHROM ID POS A1 A2 FCAS FCON IMPINFO BETA SE
+  PVAL NCAS NCON NEFF`), so the strip is a no-op for this file.
+- **Explicit `encoding='utf-8', errors='replace'`** when reading the
+  pre-scan stream. PGC's `##acknowledgments` line includes
+  non-ASCII characters (accented author names, byte 0x9d among
+  others); on Windows the default cp1252 decoder choked at byte
+  position 5,506. `errors='replace'` is safe because only `##`
+  prefix detection uses these bytes, not their content.
+
+### (b) SCZ munged.
+
+Invocation: `--input scz_trubetskoy_eur_PGC3_v3.vcf.tsv.gz
+--skip-comments --col-snp ID --col-chr CHROM --col-bp POS --col-p PVAL
+--col-n NEFF --col-info IMPINFO`.
+
+Pipeline:
+- 73 `##` lines skipped (logged).
+- 7,659,767 SNPs in.
+- INFO ≥ 0.6 filter: dropped 86,380 SNPs → 7,573,387.
+- Autosome filter: zero non-autosomal SNPs in the deposit.
+- N filter (`--n-min-frac 0.67`): dropped 121,338 SNPs below
+  39,361 (= 0.67 × max NEFF 58,749) → **7,452,049 SNPs out**.
+- λ_GC = **1.6305** (in-band for SCZ at the file's per-SNP NEFF;
+  287 distinct loci per the abstract → real polygenic signal).
+
+**Note on SCZ NEFF**: the file's `NEFF` column reports per-SNP
+effective sample size from PGC's meta-analysis weighting, NOT the
+case-control Willer formula. For 53,386 cases + 77,258 controls
+(EUR cohort per the methodsParagraph), Willer formula gives
+N_eff ≈ 126,310; the file's per-SNP NEFF maxes at 58,749 because
+PGC's pipeline accounts for trio encoding + imputation-quality
+weighting that roughly halves the naive N_eff. The right axis label
+for SCZ in the cross-GWAS power discussion is **PGC's per-SNP NEFF
+58,749**, NOT Willer-formula 126k — what MAGMA actually sees is what
+the cohort's effective power for differential expression at the gene
+level actually was. This matches the same N_eff-not-total-N
+discipline (23)(a) / (27)(a) locked for de Lange and Liu.
+
+Outputs: `data/gwas/scz_trubetskoy.{snp.loc,pval}` (gitignored
+intermediates), `results/magma/scz_trubetskoy_lambda_gc.tsv`.
+
+### (c) Reference data — MAGMA, NCBI37.3, g1000_eur all staged.
+
+Pulled from the SURF mirrors in `scripts/download_refs.sh` via
+PowerShell `Invoke-WebRequest` (bash `download_refs.sh` won't run on
+Windows — `set -euo pipefail`, `stat -c %y`, `unzip` all non-Windows).
+This serves as the "verify the fixed URLs *download*, not just
+resolve" gate that's been open since rev2 DO NOW #2.
+
+| Resource | URL | Size | Verified |
+|---|---|---|---|
+| MAGMA binary | `vu.data.surf.nl/s/lxDgt2dNdNr6DYt/download` | 3.3 MB zip → 7.2 MB binary | ELF 64-bit LSB executable, x86-64, statically linked, GNU/Linux 3.2.0, BuildID a49e0123... — MAGMA v1.10 confirmed via shipped `manual_v1.10.pdf` |
+| NCBI37.3 gene-loc | `vu.data.surf.nl/s/Pj2orwuF2JYyKxq/download` | 356 KB zip → 688 KB | 19,427 protein-coding genes, format `entrez chr start end strand symbol` |
+| 1000G EUR LD | `vu.data.surf.nl/s/VZNByNwpD8qqINe/download` | 512 MB zip → 2.86 GB .bed + 659 MB .bim + 12.6 KB .fam + 86 MB .synonyms | **503 EUR samples** (matches 1000G Phase 3 EUR cohort exactly), 22,665,064 variants |
+
+All three resources extracted to `data/reference/` matching the
+`download_refs.sh` post-unzip layout (`magma`, `NCBI37.3.gene.loc`,
+`g1000_eur.{bed,bim,fam,synonyms}`). All gitignored.
+
+### (d) MAGMA local execution status: WSL2 yes, Linux distro no.
+
+WSL2 is installed (`wsl --version` reports 2.7.3.0, kernel 6.6.114.1)
+but no Linux distribution is present (`wsl --list --online` shows the
+options; `wsl --install Ubuntu` would land Ubuntu 24.04 LTS in a few
+minutes). The MAGMA binary cannot execute natively on Windows; it's
+pre-staged for either (a) `wsl --install Ubuntu` and run locally, or
+(b) ship the binary + LD ref + gene-loc + munged sumstats to HB and
+run there. Not pursued here because installing Ubuntu via WSL is a
+deeper system change than "do everything that doesn't require HB"
+implied — Muskaan's choice whether to install or ship.
+
+### (e) plink 1.9 — not pulled; not on the .gs build path.
+
+`download_refs.sh` doesn't auto-fetch plink (one-time setup in the
+README only). MAGMA's gene-test uses the LD reference in plink
+binary format (`.bed/.bim/.fam`) but doesn't shell out to plink at
+runtime. So plink is not needed for the laptop-side MAGMA → .gs
+chain; can be skipped from this staging round.
+
+### (f) Pipeline status — 100% of laptop side now landed.
+
+Three munge intermediates ready to ship to HB:
+- `data/gwas/uc_delange.{snp.loc,pval}` — 9,486,539 SNPs, N=36,160
+- `data/gwas/yengo_height.{snp.loc,pval}` — 1,150,988 SNPs, per-SNP N
+- `data/gwas/scz_trubetskoy.{snp.loc,pval}` — 7,452,049 SNPs, per-SNP NEFF
+
+Plus full reference set at `data/reference/`. Either install
+WSL+Ubuntu and run MAGMA locally, or scp the intermediates to HB
+and run there. Liu munge waits on the open ancestry-LD decision
+(27)(c); the patched `prepare_gwas.py` is ready for it.
+
+Files updated in this batch:
+
+- `code/01_magma/prepare_gwas.py` (`--skip-comments` flag + utf-8
+  encoding for the pre-scan).
+- `data/gwas/scz_trubetskoy.{snp.loc,pval}` regenerated (gitignored).
+- `data/reference/{magma, NCBI37.3.gene.loc, g1000_eur.bed/bim/fam/synonyms}`
+  staged (gitignored).
+- `DECISIONS.md` (this entry).
+
 
 
 

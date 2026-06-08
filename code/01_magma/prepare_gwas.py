@@ -62,6 +62,15 @@ def parse_args():
              "the same N). Set to 0 to disable. See DECISIONS correction 26.",
     )
     p.add_argument(
+        "--skip-comments",
+        action="store_true",
+        help="PGC sumstats VCF v1.0 convention: skip leading lines starting "
+             "with '##' (metadata), then read the column-header line. If the "
+             "header itself starts with a single '#', that prefix is stripped "
+             "from the first column name. Use for Trubetskoy SCZ figshare "
+             "deposit and any other PGC-style file. See DECISIONS correction 28.",
+    )
+    p.add_argument(
         "--lambda-gc-out",
         default=None,
         help="If set, compute genomic inflation factor lambda_GC and write to this path "
@@ -90,7 +99,33 @@ def main():
         sys.exit("Either --col-n or --n-fixed must be provided.")
 
     print(f"[prepare_gwas] reading {args.input}", flush=True)
-    df = pd.read_csv(args.input, sep=args.sep, low_memory=False)
+    # PGC sumstats VCF v1.0 convention: ## metadata lines, then a single-'#'
+    # column header line. pd.read_csv's `comment='#'` would eat the header too,
+    # so we count the ## prefix and pass skiprows instead, then strip a leading
+    # '#' from the first column name if it survived. See DECISIONS 28.
+    skiprows = 0
+    if args.skip_comments:
+        import gzip as _gzip
+        opener = _gzip.open if str(args.input).endswith(".gz") else open
+        # Explicit utf-8 + errors='replace': PGC sumstats VCF metadata lines
+        # contain accented author names (e.g. acknowledgments listing), and
+        # Windows default cp1252 chokes on byte 0x9d. errors='replace' is
+        # safe because we only USE the ## prefix detection on these lines,
+        # not their content.
+        with opener(args.input, "rt", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if line.startswith("##"):
+                    skiprows += 1
+                else:
+                    break
+        print(f"[prepare_gwas] PGC mode: skipping {skiprows} leading '##' lines",
+              flush=True)
+    df = pd.read_csv(args.input, sep=args.sep, low_memory=False, skiprows=skiprows)
+    if args.skip_comments and len(df.columns) > 0 and str(df.columns[0]).startswith("#"):
+        new_first = str(df.columns[0]).lstrip("#")
+        print(f"[prepare_gwas] PGC mode: stripped '#' from header column 0: "
+              f"{df.columns[0]!r} -> {new_first!r}", flush=True)
+        df.columns = [new_first] + list(df.columns[1:])
     n0 = len(df)
     print(f"[prepare_gwas] {n0:,} rows on input", flush=True)
 
