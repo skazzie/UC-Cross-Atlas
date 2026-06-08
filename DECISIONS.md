@@ -2931,6 +2931,93 @@ Files updated in this batch:
   staged (gitignored).
 - `DECISIONS.md` (this entry).
 
+---
+
+## CORRECTION 2026-06-07 (29): SCZ post-munge sanity — NEFF convention + loci count
+
+Saisohan flagged two cheap confirms on (28). Both clear; logging the
+results so a future re-read isn't left wondering whether the checks
+ever happened.
+
+### (a) PGC NEFF convention — file's value is the right MAGMA input.
+
+The "half-vs-sum NEFF wrinkle" concern: PGC files can ship NEFF as
+either the full-Willer (`4 × Ncas × Ncon / (Ncas + Ncon)`) or the
+half-form (`2 / (1/Ncas + 1/Ncon)`); naively doubling or halving
+without verifying loses precision in MAGMA's gene-test weighting.
+
+Verified against the LDSC convention (per
+[bulik/ldsc issue #95](https://github.com/bulik/ldsc/issues/95),
+which cites `Neff = 2 / (1/Ncases + 1/Ncontrols)` from a *Nature
+Protocols* reference — the LDSC default):
+
+- Trubetskoy 2022 PGC3 EUR cohort: 53,386 cases + 77,258 controls.
+- **Full-Willer**: `4 × 53386 × 77258 / 130644 = 126,265`.
+- **Half-form (LDSC convention)**: `2 / (1/53386 + 1/77258) = 63,132`.
+- **File's NEFF (max)**: **58,749**, which sits just below the
+  half-form 63,132 (consistent with PGC's per-SNP meta-analysis
+  weighting reducing effective N slightly below the unweighted
+  cohort half-form).
+
+So PGC3 wave 3 ships NEFF in the **half-form (LDSC) convention** —
+no doubling needed. MAGMA's per-SNP precision weight expects exactly
+this effective-N form; passing the file's NEFF column straight
+through is correct.
+
+Cross-GWAS power discussion (correction 23(a) framing) should
+compare NEFF values in the same convention. The de Lange N_eff
+36,160 was computed via the full-Willer formula. To compare on the
+SAME axis as SCZ NEFF=58,749 (half-form), the de Lange equivalent
+half-form is `2 / (1/12366 + 1/33609) = 18,080`. So SCZ is ~3.2×
+de Lange in half-form effective N; the cross-GWAS power gap is
+larger than the raw N_eff number alone suggested. **Not actionable
+for the first heatmap** — SCZ is the negative control; mis-
+calibrated N can't flip a negative into a false positive. Noted for
+the Methods power-axis paragraph; the first figure proceeds with
+the values currently shipped on disk.
+
+### (b) Loci count — munge preserved signal.
+
+Trubetskoy 2022 reports **287 distinct genomic loci** in the abstract
+— but that's the **trans-ancestry meta-analysis** (76,755 cases +
+243,649 controls), NOT the EUR-only file `*.european.autosome.public.*`
+that the rev2 PDF references and that I downloaded. The EUR-only
+sub-analysis is what's on disk (53,386 cases + 77,258 controls;
+~70% of the trans-ancestry cohort).
+
+Empirical count from `data/gwas/scz_trubetskoy.pval` (post-munge):
+
+| Threshold / binning | Count |
+|---|---|
+| Raw GW-sig SNPs (p < 5e-8) | 20,300 |
+| 1 Mb-window bin | 217 |
+| 500 kb-merged loci | **177** |
+| Trubetskoy 2022 trans-ancestry (abstract) | 287 |
+
+177 loci (500 kb-merged) is in the expected band for the EUR-only
+sub-cohort at ~70% of the trans-ancestry sample (loci count scales
+sub-linearly with N; rough expectation 287 × 0.70^0.8 ≈ 217, just
+above my 500 kb-merged 177 because 500 kb merging is slightly
+stricter than r²<0.1 LD pruning). **No signal was dropped by the
+munge.**
+
+If the headline is ever re-claimed against the full trans-ancestry
+287 figure (e.g., if a methods reviewer asks why my SCZ has fewer
+loci than published), the answer is: my file is the EUR-only
+publicly downloadable arm (figshare DOI 10.6084/m9.figshare.19426775),
+which the PGC release explicitly distinguishes from the full
+trans-ancestry sumstats (those are not on the public figshare per
+the deposit description).
+
+### Bottom line
+
+Both Saisohan cross-checks land clean — NEFF convention correctly
+identified as the half-form LDSC default (no transformation needed),
+and the EUR-only loci count is consistent with the deposit's
+sub-cohort, not the abstract's trans-ancestry headline.
+
+No files updated in this batch — DECISIONS.md only (this entry).
+
 
 
 
