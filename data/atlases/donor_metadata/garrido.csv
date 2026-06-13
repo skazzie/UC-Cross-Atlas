@@ -1,0 +1,13 @@
+donor_id,originating_study,tissue,disease_status,assay_protocol
+HC_1,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+HC_2,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+HC_3,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+HC_4,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+HC_5,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+HC_6,Garrido-Trigo 2023 (GSE214695),colonic mucosa,normal,10X Chromium v2
+UC_1,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
+UC_2,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
+UC_3,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
+UC_4,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
+UC_5,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
+UC_6,Garrido-Trigo 2023 (GSE214695),colonic mucosa,ulcerative colitis,10X Chromium v2
