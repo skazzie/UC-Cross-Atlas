@@ -1,3 +1,11 @@
+<!--
+Status (2026-06-13, handoff/laptop-validation): code-complete;
+3 E2E tests green on synthetic fixtures (scDRS path, seismic+BH
+path, missing-input clean-exit). Awaits HB regime-1 outputs under
+both de Lange and Liu (Liu gated on DECISIONS 27(c) ancestry-LD
+decision).
+-->
+
 # 09_cross_gwas — de Lange vs Liu within-atlas concordance
 
 Concordance axis #3 from PLAN.md §"Five concordance axes": within each

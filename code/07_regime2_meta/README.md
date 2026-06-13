@@ -1,3 +1,10 @@
+<!--
+Status (2026-06-13, handoff/laptop-validation): code-complete;
+8 tests green (math + E2E on synthetic null tensors). Awaits HB
+null draws (results/null_draws/*_nulls.npz) + regime-1 TSVs to
+produce real combined p-values.
+-->
+
 # 07_regime2_meta — Brown's method per-cell-type meta-analysis
 
 Implements regime 2 from PLAN.md / DECISIONS.md: combining cell-type

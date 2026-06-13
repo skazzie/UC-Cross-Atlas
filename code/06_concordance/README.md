@@ -1,3 +1,12 @@
+<!--
+Status (2026-06-13, handoff/laptop-validation):
+- metrics.py: code-complete, 18 unit tests green.
+- compute_concordance.py: code-complete, 4 E2E tests green on
+  synthetic fixtures. Windows path bug (PATH:ATLAS:METHOD:GWAS:TIER
+  parser collided with `C:` drive letter) fixed via rsplit(":", 4).
+- Awaits HB per-(atlas, method, GWAS, tier) result TSVs.
+-->
+
 # 06_concordance — cross-atlas concordance metrics
 
 Implements the locked v1 concordance bundle from PLAN.md §"Three statistical

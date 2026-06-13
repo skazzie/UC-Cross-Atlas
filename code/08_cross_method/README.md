@@ -1,3 +1,10 @@
+<!--
+Status (2026-06-13, handoff/laptop-validation): code-complete;
+3 E2E tests green on synthetic scDRS + seismic fixtures (schema +
+seed determinism + missing-input skip-and-warn). Runs clean once
+HB produces per-atlas regime-1 outputs.
+-->
+
 # 08_cross_method — scDRS vs seismicGWAS within-atlas concordance
 
 Concordance axis #2 from PLAN.md §"Five concordance axes": within each
