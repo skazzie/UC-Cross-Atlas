@@ -247,3 +247,88 @@ results/scdrs/garrido_delange_mhc/      donor-cov, MHC-INCLUDED (sensitivity)
 - Slurm uses `--random-seed` which doesn't exist until scdrs
   1.0.4-dev. Test-retest seed design (seeds 1/2/3 per PLAN.md)
   needs 1.0.4 pinned on HB.
+
+---
+
+## Remaining laptop work to close the validation loop
+
+The laptop's job is to validate the entire analysis loop on Garrido
+(the one laptop-sized atlas) so HB only ever does RAM-bound big-atlas
+scoring. So far we've validated **one method (scDRS) on one GWAS**.
+The loop isn't closed. Order matters — earlier items unblock later
+ones.
+
+### [1] Finish MHC perform-downstream — read the 461-cell distribution
+
+In-progress (~13 min from compute-score). Question: which broad cell
+types host the 461 FDR<0.1 cells? If they cluster in HLA-high
+antigen-presenting cells (B / DC / macrophage), the MHC-included
+ranking is partly the HLA-marker tautology we flagged, not
+independent evidence of immune-cell UC enrichment. If they distribute
+across non-APC cell types, the recovered signal is more
+polygenic-real.
+
+Output: `results/scdrs/garrido_delange_mhc/UC_MHC.scdrs_group.cell_type_broad`
+(landing now).
+
+### [2] seismicGWAS on Garrido × de Lange (BOTH MHC variants)
+
+The biggest gap. The paper is a cross-method comparison and seismic
+has never run. R package, separate `uc-cross-atlas-r` conda env
+(install in progress; same isolation discipline as the LDSC Py 2.7
+env). Run Garrido × de Lange with both `.gs` files.
+
+**The question that matters:** does seismicGWAS reproduce the same
+MHC-driven inversion scDRS showed?
+
+- If both methods invert when MHC is stripped → property of the
+  gene-level signal. Robust methods-caution finding.
+- If only scDRS inverts → method-specific quirk; the cross-method
+  result becomes the headline differentiator.
+
+Either answer is a result and can only be cheaply produced on the
+laptop.
+
+### [3] Controls through both methods on Garrido
+
+SCZ (negative) and Yengo height (pipeline positive) `.gs` files are
+already built. Score Garrido through both methods for both:
+
+- **SCZ on gut atlas must be null** across cell types. If it lights
+  anything up, the approach is suspect — find out now, not after HB.
+- **Yengo height** is the pipeline positive: validates the scoring
+  machinery on a high-N polygenic trait (won't have biologically
+  meaningful gut-cell hits, but should produce stable, predictable
+  numerics).
+
+Load-bearing for the methods section.
+
+### [4] Cross-method concordance prototype on Garrido
+
+Once [2] and [3] are done, run `code/08_cross_method/run_cross_method.py`
+on the Garrido outputs. The 3 E2E tests for that script (Track D)
+exercise it on synthetic fixtures; this is the first real-data run.
+Validates the comparison machinery (Spearman, Jaccard, kappa) before
+HB feeds it five atlases of outputs.
+
+### Out of scope on the laptop (HB-only)
+
+- Loading and scoring TAURUS (12.7 GB), HCA Gut, Pan-GI, Smillie.
+  RAM-bound and HB-only by the split we already set.
+
+### Optional / deferrable
+
+- **05 gene-property smoke on Garrido** — code-validation only, the
+  locked deliverable is Smillie (HB).
+- **F10 LDSC intercept** — needs its own Py 2.7 env + `eur_w_ld_chr`;
+  the `01b_ldsc/` scaffold exists with 23 green tests, execution
+  waits on WSL Ubuntu being up (Track A0 still gated on the human
+  `wsl --install` step).
+
+### Insurance argument
+
+The MHC inversion we caught above is exactly the failure mode that
+would have cost a full HB run if we'd skipped the dry run. Finishing
+[1]-[4] on Garrido is the same insurance applied to seismic + the
+controls + the cross-method comparison. HB then becomes a known-good
+scale-up, not a debug-at-scale exercise.
