@@ -254,8 +254,48 @@ cells that express that gene block.
   cell-type prioritization; that swing IS the result, not a
   vindication of either variant.
 
-Fine-tier ranking pending (separate perform-downstream run; appended
-below when it finishes).
+**Fine-tier MHC-included ranking (top 15 by mcz, with delta vs MHC-excluded):**
+
+| Group | n_cell | mcz_MHC | mcz_noMHC | Δ | n_fdr<0.1 | % FDR<0.1 |
+|---|---|---|---|---|---|---|
+| B cell                  | 815 | **+7.73** | −0.94 | +8.66 | 119 | 14.6% |
+| Memory B cell           | 138 | **+7.06** | +1.06 | +6.01 |  35 | 25.4% |
+| M0 (macrophage)         | 153 | **+6.76** | −1.02 | +7.78 |  46 | 30.1% |
+| **DCs CD1c**            |  76 | +6.37 | −0.45 | +6.81 |  45 | **59.2%** |
+| Naive B cell            | 200 | +5.54 | −0.62 | +6.16 |  26 | 13.0% |
+| DCs CCL22               |  21 | +5.49 | +0.84 | +4.65 |   7 | 33.3% |
+| M2.2 (macrophage)       |  80 | +5.47 | −0.16 | +5.63 |  28 | 35.0% |
+| IDA macrophage          | 224 | +4.99 | +0.54 | +4.45 |  51 | 22.8% |
+| GC B cell               | 157 | +4.71 | +0.10 | +4.61 |  17 | 10.8% |
+| Cycling myeloid         |   8 | +4.41 | +1.38 | +3.03 |   1 | 12.5% |
+| M2 (macrophage)         | 154 | +3.92 | −0.16 | +4.08 |  21 | 13.6% |
+| Inflammatory monocytes  | 197 | +3.75 | +1.39 | +2.36 |  13 |  6.6% |
+| M1 ACOD1                | 169 | +3.61 | +1.43 | +2.18 |  12 |  7.1% |
+| M1 CXCL5                |   8 | +3.04 | +1.57 | +1.47 |   1 | 12.5% |
+| Inflammatory colonocyte | 518 | +2.56 | +2.78 | −0.22 |   0 |     — |
+
+**The top 13 fine-tier types by % cells reaching FDR<0.1 are ALL
+B cell, dendritic cell, or macrophage subtypes.** Inflammatory
+colonocyte is the first non-APC entry — and it has 0 FDR<0.1 cells
+*and* a tiny NEGATIVE delta (the only one in the table that gets
+*worse* with MHC included).
+
+Two readings reinforce the tautology:
+
+1. **Across all 14 fine APC subtypes, mcz went up.** Across the 65
+   non-APC fine types, the shift is mostly noise. Adding the MHC
+   block is doing the same thing it did at broad tier: it scores
+   constitutive HLA-expressors up.
+2. **The delta correlates inversely with biological UC relevance.**
+   Memory B cell delta +6.0 (B-lineage UC effector? maybe, but
+   plasma cell — the actual differentiated UC effector — has Δ ≈ 0
+   because it down-regulates HLA II during maturation). DCs CD1c
+   delta +6.8 (constitutive HLA II expressor). M0 delta +7.8 (resting
+   macrophage, very high HLA II). Compare CD8 FGFBP2 +0.0 / Δ ≈ 0
+   (T cell, low HLA II) — no movement.
+
+The fine-tier replicates the broad-tier conclusion: MHC-included
+recovery is HLA-marker scoring, not polygenic UC signal recovery.
 
 ## Outputs on disk (all gitignored)
 
