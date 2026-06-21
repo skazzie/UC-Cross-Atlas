@@ -1,12 +1,32 @@
 # Garrido × de Lange scDRS dry run — diagnostic
 
-**Status (2026-06-21):** Local laptop dry-run on the Garrido atlas
-(29,675 cells, sized for laptop validation before HB scaleup).
-Ranking is **strongly axis-resolved but inverted from the canonical-
-UC-immune expectation** — epithelial subtypes top with significant
-permutation p-values; T cells, fibroblasts, NK/ILC, mast cells sit at
-the bottom with active negative z-scores. 0/28,706 cells reach
-FDR<0.1 at the cell level.
+**Status (2026-06-21, rev 2 per Saisohan):** Local laptop dry-run on
+the Garrido atlas (29,675 cells, sized for laptop validation before
+HB scaleup). Ranking under the locked v1 policy (donor-cov + MHC-
+excluded) is **strongly axis-resolved but inverted from the
+canonical-UC-immune expectation** — epithelial subtypes top with
+significant permutation p-values; T cells, fibroblasts, NK/ILC, mast
+cells sit at the bottom with active negative z-scores. 0/28,706
+cells reach FDR<0.1 at the cell level.
+
+Three sensitivities + a per-gene length test isolate the cause:
+**the gene set, not the covariates and not gene-length inflation.**
+The dominant mechanism is the **locked MHC exclusion**: removing
+chr 6 strips the bulk of the immune-coded signal in de Lange UC.
+
+**Honest framing of the contribution (rev 2).** Neither MHC choice
+is clean: MHC-excluded gives an epithelial artifact (immune signal
+too sparse to beat expression-matched controls); MHC-included gives
+an HLA-marker + LD-smear artifact (HLA genes are themselves
+antigen-presenting-cell markers, so adding them mechanically scores
+B / DC / macrophage up partly by construction; the MHC region's
+extreme LD also smears one association across many correlated
+genes). The result is a **methods-caution trade-off**, not a
+discovery: the standard MHC-exclusion hygiene inverts cell-type
+prioritization for UC; the inversion is not a covariate or length
+artifact; neither MHC choice is independent of confound. The v1
+primary stays **MHC-excluded** (the convention reviewers expect);
+MHC-included is the **documented sensitivity**.
 
 This file records what we tested, what we ruled in, what we ruled
 out, and what the M4 narrative needs to honestly say.
@@ -125,7 +145,7 @@ genes are RELATIVELY enriched over the 1000 matched control sets,
 even though absolute expression is higher in stromal/myeloid. That
 mechanism is correct scDRS behavior given the gene set's composition.
 
-## What's actually driving it — Hypothesis 4 (likely): MHC exclusion
+## What's actually driving it — Hypothesis 4: MHC exclusion (confirmed mechanism, not vindication)
 
 After length/NSNPS residualization, **8 of the top 10 de Lange UC
 gene-Z values are MHC-region genes** (POU5F1, TAP1, BTNL2, TCF19,
@@ -133,8 +153,7 @@ MICA, HLA-C, MICB on chr 6). The locked v1 policy excludes MHC from
 the scDRS `.gs` (PLAN.md / DECISIONS.md — chr 6: 28,477,797–
 33,448,354 GRCh37). That strips the bulk of the immune-coded signal
 in de Lange UC and leaves the residual non-MHC weights — which
-happen to over-weight epithelial-expressed genes — as the dominant
-driver.
+under-weight immune — as the dominant driver.
 
 **Diff between the two `.gs` files** (`results/magma/uc_delange.gs`
 vs `results/magma/uc_delange_mhc.gs`):
@@ -147,8 +166,40 @@ vs `results/magma/uc_delange_mhc.gs`):
   ADGRL3, AIMP1, ARHGAP12, BAZ1A, BEND6, BPIFC, ... long-tail of
   non-immune-themed genes.
 
-**Sensitivity result:** *(appended below when the
-`results/scdrs/garrido_delange_mhc/` run completes)*
+**Sensitivity result (compute-score level).** Garrido × de Lange
+with `uc_delange_mhc.gs`, donor covariates per locked design,
+n_ctrl=1000:
+
+- **MHC-included**: **461 / 28,706 cells FDR<0.1** (1,267 at <0.2).
+- MHC-excluded (locked v1): 0 / 28,706 cells FDR<0.1 (1 at <0.2).
+
+Order-of-magnitude effect at the cell level — confirms MHC exclusion
+is the dominant inversion driver.
+
+### Why "MHC-included ≠ correct answer" — two confounds
+
+1. **HLA genes are themselves immune-cell markers.** Class II
+   (HLA-DR, -DQ, -DP) is highly expressed in B cells, dendritic
+   cells, and macrophages; class I is broad. A gene set that
+   contains the MHC block will mechanically score
+   antigen-presenting and immune cells up *partly by construction*.
+   This is not the same as recovering a polygenic UC signal in
+   those cells.
+
+2. **MHC's extreme LD means one association smears across many
+   correlated genes**, inflating enrichment for whatever cell types
+   express the region.
+
+This is why MHC is conventionally excluded from polygenic-trait
+gene sets in the first place. We are NOT re-locking MHC inclusion
+as the default — that would quietly swap to the variant with its
+own confound. Keep MHC-excluded as primary, MHC-included as the
+documented sensitivity. The trade-off itself is the result.
+
+**Per-cell-type sensitivity ranking** (where do the 461 cells land?
+key question — if they cluster in HLA-high APCs, the MHC-included
+ranking is partly a tautology): *(appended below when
+perform-downstream completes)*
 
 ## Outputs on disk (all gitignored)
 
