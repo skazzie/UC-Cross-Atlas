@@ -240,6 +240,7 @@ data/atlases/garrido/
 
 # scDRS covariate tables (regenerable from the h5ad via build_*_cov.py).
 data/atlases/*_covariates.tsv
+data/atlases/*_covariates_*.tsv
 
 # Reference data
 data/reference/*.bed
