@@ -196,10 +196,66 @@ as the default — that would quietly swap to the variant with its
 own confound. Keep MHC-excluded as primary, MHC-included as the
 documented sensitivity. The trade-off itself is the result.
 
-**Per-cell-type sensitivity ranking** (where do the 461 cells land?
-key question — if they cluster in HLA-high APCs, the MHC-included
-ranking is partly a tautology): *(appended below when
-perform-downstream completes)*
+**Per-cell-type sensitivity ranking — HLA tautology confirmed.**
+
+Broad-tier scdrs_group output with MHC-included `.gs` (donor cov,
+n_ctrl=1000):
+
+| Rank | Cell type | n_cell | mcz | n_fdr<0.1 | % cells FDR<0.1 |
+|---|---|---|---|---|---|
+| 1  | B cell                 | 1,310 | **+7.35** | 197 | **15.0%** |
+| 2  | dendritic cell         |    97 | **+6.51** |  52 | **53.6%** |
+| 3  | monocyte/macrophage    |   993 | **+5.16** | 173 | **17.4%** |
+| 4  | colonocyte             | 3,530 | +2.34 |   9 | 0.3% |
+| 5  | epithelial progenitor  | 2,134 | +1.60 |   5 | 0.2% |
+| 6  | mural/glia             |   134 | +1.13 |   0 |    — |
+| 7  | endothelium            |   227 | +0.74 |   0 |    — |
+| 8  | goblet                 | 1,237 | +0.53 |   1 | 0.08% |
+| 9  | granulocyte            |   145 | +0.28 |   0 |    — |
+| 10 | enteroendocrine/tuft   |   332 | +0.24 |   1 | 0.30% |
+| 11 | plasma cell            | 8,900 | −0.09 |  21 | 0.24% |
+| 12 | NK/ILC                 |   166 | −1.27 |   0 |    — |
+| 13 | fibroblast             | 1,668 | −2.05 |   0 |    — |
+| 14 | mast cell              |   520 | −2.08 |   0 |    — |
+| 15 | **T cell**             | 7,313 | **−2.53** |   2 | 0.03% |
+
+Cell-level totals: 111 cells at FDR<0.05, **461 at <0.1**, 1,267 at
+<0.2.
+
+**422 of 461 FDR<0.1 cells (91.5%) cluster in the three classical
+antigen-presenting cell types** (B cell + dendritic cell +
+monocyte/macrophage). This is the HLA-marker tautology Saisohan
+predicted — HLA class II is highly expressed in exactly these three
+lineages by constitutive mechanism, not by biology. The MHC block
+in the gene set mechanically scores them up because they ARE the
+cells that express that gene block.
+
+**Counter-evidence to a "polygenic immune recovery" reading**:
+
+- **T cell stays negative (−2.53), MORE negative than MHC-excluded
+  (−2.02).** If MHC inclusion were recovering a polygenic immune
+  signal, T should move toward 0. It moves away.
+- **NK/ILC stay negative** (−1.27 vs −1.45 MHC-excl). Same pattern.
+- **Plasma cell stays ~null** (−0.09 vs −0.40 MHC-excl). Plasma cells
+  down-regulate HLA class II during terminal differentiation — and
+  they don't light up, even though they would if a real T/B-cell-axis
+  UC signal were being captured.
+- The cell-type pattern matches "high constitutive HLA expression,"
+  not "polygenic UC risk."
+
+**Conclusion for the M4 trade-off section:**
+
+- **MHC-excluded (locked v1 primary)**: epithelial artifact, T cell
+  actively negative, 0 FDR-hit cells.
+- **MHC-included (sensitivity)**: HLA tautology, T cell *more*
+  negative, 461 FDR-hit cells concentrated 91.5% in APCs.
+- Neither extreme is the immune-driven UC story. Both are confounded
+  in opposite directions. The MHC handling fundamentally swings UC
+  cell-type prioritization; that swing IS the result, not a
+  vindication of either variant.
+
+Fine-tier ranking pending (separate perform-downstream run; appended
+below when it finishes).
 
 ## Outputs on disk (all gitignored)
 
