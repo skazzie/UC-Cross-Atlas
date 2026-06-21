@@ -110,22 +110,30 @@ for (s in magma_specs) {
 
   t1 <- Sys.time()
   message(sprintf("[seismic] get_ct_trait_associations (%s) ...", tag))
-  # seismicGWAS uses a data.table with `gene` + `z` columns by default.
-  mz <- data.table::data.table(gene = magma_z$SYMBOL, z = magma_z$ZSTAT)
+  # seismicGWAS::get_ct_trait_associations defaults to magma_gene_col='GENE'
+  # and magma_z_col='ZSTAT'. The GENE column is matched against the SCE
+  # rownames, which for Garrido are HGNC symbols (the loader's
+  # ensembl_to_hgnc step strips Ensembl). So GENE in the magma data
+  # must be the SYMBOL column from our gene-Z TSV, not the ENTREZ id.
+  mz <- data.table::data.table(GENE = magma_z$SYMBOL, ZSTAT = magma_z$ZSTAT)
   res <- get_ct_trait_associations(spec_obj, mz)
   message(sprintf("[seismic] regression done in %s",
                   format(round(Sys.time() - t1, 1))))
 
-  # Build headline TSV; mirror the run_seismic.R schema.
+  # seismicGWAS::get_ct_trait_associations returns ONLY cell_type, pvalue,
+  # FDR (one-sided p from the linear-model slope). No coefficient/se. We
+  # synthesize 'score' = -log10(pvalue) so the cross-method TSV layer
+  # (result_loading.shared_cell_types + 06_concordance) has a comparable
+  # signed magnitude column matching scDRS's z_mean. Larger-is-stronger
+  # convention preserved (mirrors DEFAULT in 08_cross_method test fixtures).
   n_cells_per_ct <- as.integer(table(SummarizedExperiment::colData(sce)[[ct_col]]))
   names(n_cells_per_ct) <- names(table(SummarizedExperiment::colData(sce)[[ct_col]]))
 
   headline <- data.frame(
-    cell_type   = res$cell_type,
-    coefficient = if (!is.null(res$coefficient)) res$coefficient else res$coef,
-    se          = res$se,
-    pvalue      = res$pvalue,
-    n_genes     = res$n_genes,
+    cell_type   = as.character(res$cell_type),
+    pvalue      = as.numeric(res$pvalue),
+    fdr         = as.numeric(res$FDR),
+    score       = -log10(as.numeric(res$pvalue)),
     n_cells     = n_cells_per_ct[as.character(res$cell_type)],
     stringsAsFactors = FALSE
   )
