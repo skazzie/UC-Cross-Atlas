@@ -410,6 +410,20 @@ scDRS column = `assoc_mcz`. seismic column = `−log10(pvalue)`. Larger = strong
 
 ### Saisohan's question answered
 
+> **2026-06-27 amendment** — the interpretation in items 1–3 below
+> is **partially superseded by DECISIONS 30(a)**. The T-cell-bottom
+> conclusion in item 1 was internally contradictory (says
+> "trait-specific" while listing Height T cell at rank 14/15). The
+> reproducible side-by-side now lives at
+> `results/concordance/controls_sidebyside_broad.md` (generator:
+> `code/06_concordance/controls_sidebyside_broad.py`). Locked reads:
+> APC-up survives the controls test in both methods (UC-specific);
+> scDRS T-cell-bottom is shared with Height (methods baseline
+> concern) and seismic does not replicate it; IBDverse cross-check
+> is now the adjudicator. The paragraphs below stay in place as a
+> historical record but the manuscript paragraph must follow
+> DECISIONS 30(a), not items 1–3 here.
+
 **Are UC's findings (T-cell-bottom, APC-up under MHC-incl, epithelial-on-top) trait-specific or baseline method bias?**
 
 Comparing UC against SCZ + Height on the same atlas under the same methods:

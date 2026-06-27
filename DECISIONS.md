@@ -3018,7 +3018,299 @@ sub-cohort, not the abstract's trans-ancestry headline.
 
 No files updated in this batch — DECISIONS.md only (this entry).
 
+---
 
+## CORRECTION 2026-06-27 (30): Controls side-by-side reinterpretation + broad-tier-only concordance limitation
 
+Two distinct locks in one entry, both landed in response to Saisohan's
+2026-06-24 batch review.
 
+### (a) Controls track [3] is executed-but-interpretation-open, not closed
+
+Track [3] runs (SCZ + Yengo height on Garrido through scDRS + seismic)
+landed in the 2026-06-21 batch and `docs/garrido_dry_run_diagnostic.md`
+(track [3] section, lines ~379-473) presented a three-trait broad
+panel. The interpretation paragraph there (lines 411-421) concluded
+"T-cell-bottom is trait-specific" while listing Height T cell at rank
+14/15 — internally contradictory: scDRS bottom-3 IS shared between UC
+and Height for T cell (UC rank 15, Height rank 14) and NK/ILC (UC 13,
+Height 15). That is the methods-baseline signal the controls were
+supposed to rule out, not rule in.
+
+Reproducible side-by-side now lives at
+`code/06_concordance/controls_sidebyside_broad.py`, emitting:
+
+- `results/concordance/controls_sidebyside_broad.csv` — per cell type
+  z + rank for {UC, SCZ, Height} × {scDRS, seismic}
+- `results/concordance/controls_sidebyside_broad.md` — human-readable
+  ranking + crosstalk flags
+- `results/concordance/controls_sidebyside_broad.json` — cross-GWAS
+  Spearman ρ within each method
+
+**Locked interpretation** (replaces the dry-run-diagnostic paragraph
+on this question — that paragraph stays in place as a historical
+record but its conclusion is superseded by this entry):
+
+1. **APC-up is UC-specific in both methods.** scDRS UC top-3
+   (colonocyte, epithelial progenitor, goblet) appears in neither
+   SCZ top-3 nor Height top-3. seismic UC top-3 (goblet, epithelial
+   progenitor, dendritic cell) same. The headline epithelial /
+   APC-up finding survives the controls test.
+2. **scDRS T-cell-bottom is partial methods baseline, NOT clean
+   UC-specific signal.** T cell is rank 15 for UC AND rank 14 for
+   Height under scDRS. NK/ILC also bottom in both. UC vs Height
+   Spearman ρ = +0.34 in scDRS. The "bulk T cell not prioritized"
+   finding cannot be claimed as UC biology from Garrido scDRS alone.
+3. **seismic does NOT show the T-cell-bottom in UC.** seismic UC T
+   cell ranks 6/15 (mid). UC vs Height ρ = +0.04 in seismic. The
+   scDRS-vs-seismic divergence on T-cell-bottom is itself a result
+   and must be reported cross-method, not averaged.
+4. **SCZ top in scDRS is glia (z=+4.23), not null.** This is
+   biologically defensible (enteric glia share neural-crest program
+   with CNS glia; SCZ has glial enrichment per Trubetskoy 2022) and
+   is the dry-run diagnostic's existing read — preserved.
+
+**Implication for IBDverse cross-check sequencing**: IBDverse is now
+load-bearing — it is the external adjudicator for the
+scDRS-vs-seismic T-cell-bottom disagreement. The T-cell claim cannot
+go into the manuscript at all without IBDverse adjudication or
+Smillie/TAURUS replication once HB lands.
+
+**OPEN_FLAGS updated**: F11 added (controls-interpretation gate on
+T-cell-bottom). Track [3] amended from "closed" to "executed; locked
+interpretation in DECISIONS 30(a); methods-baseline gate open
+pending IBDverse adjudication".
+
+### (b) Cross-atlas concordance is broad-tier-only by construction
+
+Locking the structural limitation flagged in Saisohan's 2026-06-24
+review while it is fresh. **Fine labels do not harmonize across
+atlases** — each atlas uses native fine annotations (Garrido's 86
+post-Ribhi labels, Smillie's ~50, TAURUS's 109 cell_states, HCA's
+~120 author_cell_types, Pan-GI's ~70 level_3_annot) whose subtype
+boundaries are study-specific (CD4 ANXA1 vs CD4+ Memory vs CD4
+S1PR1 are not the same population definition). The candidate F8
+fine-tier vocabulary collapses these into 14 buckets that DO
+harmonize at the broad/lineage tier, but the within-bucket
+resolution is not cross-atlas alignable. Therefore:
+
+1. **Cross-atlas reproducibility is a broad-resolution claim.**
+   The 3×3 (UC trio) and 5×5 (full panel) cross-atlas concordance
+   figures report broad-tier ρ / Jaccard / κ only. No fine-tier
+   cross-atlas concordance figure exists in v1 by design.
+2. **The "bulk T cell not prioritized" finding** (assuming it
+   survives DECISIONS 30(a) adjudication) **cannot be refined
+   cross-atlas to a specific T subset.** "Tregs are bottom across
+   atlases" or "CD8 IELs are bottom across atlases" are claims this
+   project cannot make from cross-atlas data. Per-atlas fine-tier
+   panels appear as supplementary, not as cross-atlas concordance.
+3. **The reproducibility claim in the manuscript is broad-tier
+   reproducibility.** "Five atlases reproducibly rank cell type X
+   at the broad tier for UC" — that is the strongest cross-atlas
+   claim this project can sustain. Fine-tier patterns shown in
+   per-atlas supplementary figures are atlas-specific by
+   construction.
+
+**Limitation paragraph for the manuscript** (parked here pending
+manuscript draft):
+
+> Cross-atlas concordance in this study is reported at the broad
+> (lineage) tier of cell-type annotation only. Native fine-tier
+> annotations differ in subtype boundaries across the five atlases
+> (e.g. CD4+ T-cell subdivision varies between Garrido-Trigo,
+> Smillie, and TAURUS), so a fine-tier cross-atlas reproducibility
+> metric cannot be defined without imposing a post-hoc subtype
+> harmonization that the source studies do not share. Per-atlas
+> fine-tier prioritization is presented in Supplementary Figure
+> [N]; cross-atlas reproducibility is reported only at the broad
+> tier in the main figures.
+
+**Promotes from**: OPEN_FLAGS F8 (fine vocab) acknowledged this
+structurally but did not lock the manuscript-claim implication.
+This entry locks it.
+
+**Does NOT close F8.** F8 (the 14-bucket fine vocab) is still useful
+for per-atlas fine-tier panels and for the within-bucket coverage
+documentation — just not for cross-atlas concordance.
+
+**Addendum 2026-06-27 (response to Saisohan's review of this entry):**
+Item 1 above ("No fine-tier cross-atlas concordance figure exists in
+v1 by design") is sharper than the underlying truth. The accurate
+framing is **v1-scope absence, not design absence**:
+
+- What IS structurally true: NATIVE fine labels do not harmonize
+  cross-atlas (study-specific subtype boundaries). A claim using
+  native labels — "X-specific T subset is bottom across atlases" —
+  is not constructible.
+- What is NOT structurally true: cross-atlas fine-tier concordance
+  is impossible. The F8 14-bucket fine vocab IS designed to be
+  cross-atlas-alignable. Once the F8 fine-tier work (P3 tail —
+  coded, not yet computed) lands against real data, the cross-atlas
+  fine concordance figure follows at the 14-bucket level.
+
+Manuscript language must therefore say "fine-tier cross-atlas
+analysis is pending data," NOT "we only report broad cross-atlas by
+design." A reviewer reads those very differently. See OPEN_FLAGS F12
+(reframed) for the manuscript template paragraph.
+
+The bulk-T-cell-bottom claim (assuming it survives DECISIONS 30(a)
+adjudication) cannot be refined to a NATIVE T-subset cross-atlas,
+but CAN be refined to the F8 `t_cell_broad` bucket — which is the
+only F8 fine bucket on the T branch in v1, so that "refinement" is
+the v1-scope same-as-broad result. v2 expansion of the T-branch
+fine vocab is where genuine sub-T-subset cross-atlas analysis
+becomes possible.
+
+### Files updated in this batch
+
+- `code/06_concordance/controls_sidebyside_broad.py` (new) — pulls
+  the three GWAS × two methods broad scoring tables off disk and
+  emits the side-by-side artifact + crosstalk flags + cross-GWAS ρ
+  matrix. Reproducible — re-run on any rescore.
+- `results/concordance/controls_sidebyside_broad.{csv,md,json}` (new,
+  gitignored per results/ convention).
+- `OPEN_FLAGS.md` — F11 added (controls-interpretation gate);
+  track [3] status amended from "closed" to "executed; interpretation
+  locked in DECISIONS 30(a); methods-baseline gate open".
+- `DECISIONS.md` (this entry).
+
+No code in `06_concordance/compute_concordance.py` or the cross-atlas
+prototype changed — those drivers were not gated by this finding.
+
+---
+
+## CORRECTION 2026-06-27 (31): TAURUS / HCA Gut / Pan-GI crosswalk drafted from papers — granularity gates now live pre-HB
+
+Direct response to Saisohan's 2026-06-24 ask: "draft those three
+mappings now from the papers and supplements, and mark them 'verify
+against obs on load' rather than '<pending-HB>.' The h5ad obs is the
+authoritative source if it disagrees with the paper, fair, but a
+draft-to-verify is strictly safer than a blank-to-fill, and it is
+laptop work available today."
+
+### What changed
+
+`scripts/build_celltype_crosswalk.py` previously emitted skeleton
+`<pending-HB>` rows for TAURUS / HCA Gut / Pan-GI (one per
+canonical_broad bucket per atlas, plus one fine placeholder per
+atlas). That deferred the entire cell-type-ontology mapping to
+whoever runs HB, which is the wrong task on the wrong person's
+plate — bioinformatician's call, not cluster operator's. It also
+deferred surfacing granularity mismatches (an atlas splitting T
+cells N ways or too coarse to separate two canonical buckets) until
+after Amanda spent HB compute on the wrong granularity.
+
+The script now ships three paper-supplement-sourced draft blocks at
+module level:
+
+- `_TAURUS_DRAFT_FINE` — 47 of 109 `cell_state` labels mapped to
+  canonical_broad + canonical_fine, sourced from Thomas et al. 2024
+  (PMC11519010) Extended Data Fig 1c-j dotplot legends. Remaining
+  ~62 labels stay as a single `<pending-HB-unseen: ~64 labels>` row.
+- `_HCA_DRAFT_FINE` — ~94 of ~120 `author_cell_type` labels mapped,
+  sourced from Elmentaite 2021 (PMC8426186) full-text. PMC excerpt
+  was thin on the myeloid compartment; mast / monocyte / DC /
+  granulocyte broad rows ship as `paper-supplement-uncertain`
+  pending obs enumeration.
+- `_PANGI_DRAFT_FINE` — 47 of 136 `level_3_annot` labels mapped,
+  sourced from Oliver 2024 (PMC11578898) Fig 1-4 captions. Pan-GI
+  is the only granulocyte anchor across all five atlases.
+
+Every drafted row is marked `source = paper-supplement` (or the
+`-structural-zero` / `-uncertain` variants for broad rows) with notes
+prefixed `VERIFY ON LOAD:`. The TSV header was updated to document
+this provenance. Companion narrative (granularity flags, uncertain
+rows, naming caveats, source URLs, HB extension instructions) lives
+in `data/atlases/crosswalk_draft_notes.md`.
+
+### Granularity gates now visible pre-HB
+
+The whole point of the early draft was surfacing granularity
+mismatches before HB scoring. The draft makes the following visible
+without loading a single h5ad:
+
+1. **TAURUS T-cell-compartment collapses 14 → 1 at canonical_broad.**
+   F8 fine vocab has only `t_cell_broad` for the T branch — none of
+   Th / Tfh / Tph / Treg / CD8-GZMK* / MAIT / gd are individually
+   cross-atlas alignable. Confirms (does not refute) DECISIONS 30(b)
+   broad-tier-only-concordance lock at the atlas-mapping level.
+2. **HCA Gut has 6 LEC subtypes (LEC1-6) and 8+ enteric neuron
+   branches** — fine granularity loss is real and per-design
+   collapsing into `lymphatic_endothelial` and `enteroglial` is the
+   correct call. No vocab revision needed.
+3. **Pan-GI's INFLAREs are novel and Pan-GI-singleton** at
+   canonical_broad — no direct counterpart in Smillie / Garrido /
+   TAURUS / HCA. Tentative mapping to `paneth_like` is biologically
+   reasonable (MUC6+, secretory, metaplastic). The bucket will be
+   single-source at cross-atlas; downstream figure should mark this
+   explicitly rather than treat missing rows as "low concordance."
+4. **`granulocyte` is single-source (Pan-GI only) across all five
+   atlases.** Smillie / TAURUS / Garrido / HCA all likely structural
+   zeros (mucosal biopsy droplet 10x lyses granulocytes;
+   confirmed-or-suspected per atlas in the draft notes). Cross-atlas
+   reproducibility for granulocyte is therefore not possible from
+   v1; flag in any results paragraph that mentions granulocyte.
+5. **HCA's `Erythroid` label** is `canonical_broad = (exclude)` —
+   developmental, not in the 15-term vocab. Drop in QC, do NOT
+   count as a structural zero.
+
+### What still requires HB obs
+
+The drafts are NOT a substitute for the first HB load — they reduce
+the unknowns from "every label" to "the unseen subset" and they
+catch granularity mismatches now rather than after wrong-granularity
+scoring. On first HB load, the operator must:
+
+1. Dump `adata.obs[<fine_col>].unique()` per atlas.
+2. Diff against the drafted labels; resolve into drafted-confirmed
+   / drafted-but-renamed / unseen per the procedure in
+   `crosswalk_draft_notes.md`.
+3. Extend the draft block for unseen labels; decrement
+   `_*_UNSEEN_FINE_EST`.
+4. Convert `paper-supplement-uncertain` broad rows to populated or
+   structural-zero based on obs.
+5. Log the reconciliation as a new DECISIONS correction (one per
+   atlas pass) so the draft-to-confirmed transition is auditable.
+
+### Coverage summary
+
+| Atlas | Drafted fine | Paper-reported fine | Unseen | Broad uncertain | Broad structural-zero |
+|---|---:|---:|---:|---|---|
+| TAURUS | 47 | 109 | ~62 | mast cell, mural/glia | granulocyte |
+| HCA Gut | 94 | ~120 | ~26 | mast cell, monocyte/macrophage, dendritic cell, granulocyte | (none) |
+| Pan-GI | 47 | 136 | ~89 | (none) | (none) |
+
+Total drafted: 188 native fine labels mapped to canonical_broad +
+canonical_fine with paper citations. Total still-pending: ~177 labels
+flagged via three residual `<pending-HB-unseen>` rows.
+
+### Sequencing implication
+
+Per Saisohan's batch directive: crosswalk first (this entry), then
+IBDverse cross-check wire-up next. Crosswalk gates the quality of
+Amanda's HB scoring (drives the right granularity); IBDverse is the
+external adjudicator for DECISIONS 30(a)'s scDRS-vs-seismic
+T-cell-bottom disagreement and the highest-value remaining unblocked
+laptop item.
+
+### Files updated in this batch
+
+- `scripts/build_celltype_crosswalk.py` — added module-level draft
+  constants `_TAURUS_DRAFT_FINE`, `_HCA_DRAFT_FINE`,
+  `_PANGI_DRAFT_FINE` (with `_UNSEEN_FINE_EST`, `_STRUCTURAL_ZEROS`,
+  `_UNCERTAIN_BROAD` peers); added `_build_paper_supplement_rows()`
+  helper; rewrote `_build_taurus_rows()` / `_build_hca_gut_rows()` /
+  `_build_pangi_rows()` to call it; updated `HEADER_COMMENT`.
+- `data/atlases/celltype_crosswalk.tsv` — regenerated, 406 rows
+  (was 251 rows). TAURUS 63 (1 pending), HCA 111 (1 pending),
+  Pan-GI 63 (1 pending), Garrido 104 unchanged, Smillie 65 unchanged.
+- `data/atlases/crosswalk_draft_notes.md` (new) — companion narrative
+  with source URLs, granularity flags, uncertain rows, naming
+  caveats, cross-atlas summary table, and HB extension procedure.
+- `DECISIONS.md` (this entry).
+
+No loader code changed. The drafts are crosswalk-only; loader
+mapping (`LOW_TO_BROAD` in `load_taurus.py`, the unmapped category
+passthrough in `load_hca_gut.py` / `load_pangi.py`) still has to land
+on first HB load, informed by — and verifying — the draft block.
 
