@@ -3022,3 +3022,11 @@ No files updated in this batch — DECISIONS.md only (this entry).
 
 
 
+
+## CORRECTION 2026-07-03: scDRS version pinned to 1.0.2
+environment.yml pinned scdrs==1.0.4, which is not a release — it's the scDRS
+master/development version (PyPI tops at 1.0.2). Pinning by that name is
+non-reproducible. Locked to v1.0.2 (PyPI + git tag). Pipeline uses no
+--adj-prop (grep-confirmed), so the post-1.0.2 (1.0.3b) fix does not apply.
+GCP VM (uc-cross-atlas env, R 4.5.3) mirrors this; sync HB (uc-scrna) to
+scdrs==1.0.2 on next access to guarantee cross-machine parity.
