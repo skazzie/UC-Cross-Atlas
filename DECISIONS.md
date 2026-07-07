@@ -3066,3 +3066,21 @@ PIPELINE PORTABILITY DEBT (committed scripts assume HB+SLURM; broke on bare VM):
     03_scdrs_compute.slurm will NOT run as-committed on this stack.
   - perform-downstream: 'connectivities not found' -> hetero_mcp unreliable without
     sc.pp.neighbors; assoc results valid.
+
+## SESSION 2026-07-07 (cont.): MHC-exclusion 2x2 replicates across GWAS
+Garrido-Trigo, {de Lange, Liu} x {MHC-excluded, MHC-included}, cell_type_broad.
+MHC-EXCLUDED (both GWAS): epithelial progenitor + colonocyte top-significant
+  (mcz ~2.6-3.9); APCs null/negative; T cell strongly negative (mcz ~-2.2 to -2.6).
+MHC-INCLUDED (both GWAS): B cell / dendritic / monocyte-macrophage top
+  (mcz ~4.3-7.4); epithelium drops to marginal; T cell still negative.
+de Lange and Liu APC enrichment nearly IDENTICAL when MHC included
+  (B cell +7.29 vs +7.44) despite divergent MAGMA top-hit profiles -> cell-type
+  attribution is robust to GWAS choice, driven by convergent non-MHC gene structure.
+T cell negative in all 4 cells -> signal is antigen-presenting-specific (HLA class II),
+  robust to MHC and GWAS.
+CONCLUSION: locked v1 MHC-exclusion default inverts UC cell-type attribution from
+  APC (immune) to epithelial. As committed, pipeline would report epithelial UC
+  signal when the dominant biology is antigen-presenting. ESCALATE to M-level:
+  report MHC-included, or both, for cross-atlas cell-type conclusions.
+CAVEATS: Garrido only (N=1 atlas); depth+donor-corrected, sex unavailable (not
+  headline config); scdrs 1.0.2 group hetero_mcp unreliable (no kNN graph).
