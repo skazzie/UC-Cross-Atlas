@@ -272,6 +272,7 @@ data/gwas/*.pval
 # Generated results — ignore everything inside but keep the folder
 results/*
 !results/.gitkeep
+!results/MANIFEST.md
 
 # Keep the .gitkeep placeholders for data subfolders
 !data/gwas/.gitkeep
