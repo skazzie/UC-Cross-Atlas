@@ -16,14 +16,19 @@ on UC colon mucosa:
   (correlation-aware Fisher's combination).
 
 We compare these regimes side-by-side on three independent UC colon
-atlases (Smillie 2019, Kong 2023, Mennillo 2024) against two UC GWAS
-(de Lange 2017, Liu 2023 multi-ancestry), using two methods (scDRS,
-seismicGWAS) at two cell-type granularity tiers (broad ~10–15 cell types;
-fine ~30–50 cell states). We also compare to two broad multi-tissue gut
-atlases — HCA Gut Cell Atlas (external single-atlas reference; nested
-within Pan-GI as ~25% of Extended+, per DECISIONS.md correction 3/7) and
-Pan-GI (integration-pipeline-robustness comparator with known donor
-overlap).
+atlases against two UC GWAS (de Lange 2017, Liu 2023 multi-ancestry),
+using two methods (scDRS, seismicGWAS) at two cell-type granularity tiers
+(broad ~10–15 cell types; fine ~30–50 cell states).
+
+**Core UC atlases:** Smillie 2019 (SCP259), Garrido-Trigo 2023
+(GSE214695; replaced Kong 2023, DECISIONS corr 2/7), TAURUS-IBD
+(Thomas 2024, Zenodo 10.5281/zenodo.14007626; replaced Mennillo 2024,
+DECISIONS corr 16).
+
+**Broad comparators:** HCA Gut Cell Atlas (Elmentaite 2021; external
+single-atlas reference; nested within Pan-GI as ~25% of Extended+, per
+DECISIONS correction 3/7) and Pan-GI (Oliver 2024;
+integration-pipeline-robustness comparator with known donor overlap).
 
 The full plan is in [`docs/uc-cross-atlas-v1-plan.pdf`](docs/uc-cross-atlas-v1-plan.pdf);
 [`PLAN.md`](PLAN.md) is a tight operational summary.
@@ -53,10 +58,20 @@ and v2 trajectory at M0.
 - **Other:** MAGMA pipeline (joint), broad-atlas comparators (joint),
   figures (joint).
 
-## Status
+## Status (2026-07-07)
 
-`[M0 / M1 / ...]`. See [`PLAN.md`](PLAN.md) §"Three explicit fork points"
-for descope decisions.
+Code scaffold complete (13-step pipeline). Executed analysis to date:
+Garrido-Trigo through scDRS (de Lange headline + MHC-sensitivity + controls);
+Liu MAGMA + Garrido × Liu scDRS. seismicGWAS on Garrido ran but outputs were
+not saved and must be re-run. Remaining: scDRS/seismic on Smillie, TAURUS,
+HCA Gut, Pan-GI; all 5 concordance axes; test-retest; regime-2 (Brown's);
+manuscript. See [`CONTINUITY.md`](CONTINUITY.md) for full state and
+[`results/MANIFEST.md`](results/MANIFEST.md) for the per-analysis inventory.
+
+Canonical compute + results machine: GCP VM (`ucca-compute`). Hummingbird
+holds no results.
+
+See [`PLAN.md`](PLAN.md) §"Three explicit fork points" for descope decisions.
 
 ## Repository structure
 
@@ -70,7 +85,7 @@ for descope decisions.
 │   └── uc-cross-atlas-pre-project-curriculum.pdf
 ├── data/
 │   ├── gwas/                   # de Lange + Liu 2023 + Trubetskoy
-│   ├── atlases/                # Smillie, Kong-UC, Mennillo, HCA Gut, Pan-GI
+│   ├── atlases/                # Smillie, Garrido-Trigo, TAURUS-IBD, HCA Gut, Pan-GI
 │   │   └── donor_metadata/     # per-atlas donor_metadata.csv (v2-setup pattern)
 │   └── reference/              # 1000G EUR, CL ontology, HGNC pin
 ├── code/
