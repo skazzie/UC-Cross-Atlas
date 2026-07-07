@@ -3030,3 +3030,39 @@ non-reproducible. Locked to v1.0.2 (PyPI + git tag). Pipeline uses no
 --adj-prop (grep-confirmed), so the post-1.0.2 (1.0.3b) fix does not apply.
 GCP VM (uc-cross-atlas env, R 4.5.3) mirrors this; sync HB (uc-scrna) to
 scdrs==1.0.2 on next access to guarantee cross-machine parity.
+
+## SESSION 2026-07-07: GCP compute bridge + first scDRS smoke test (Garrido × de Lange)
+Ran the pipeline end-to-end on a GCP VM (ucca-compute, e2-highmem-8, uc-cross-atlas env).
+KEY RESULT — MHC exclusion inverts the top cell-type compartment on Garrido-Trigo:
+  - MHC-EXCLUDED (v1 default): only epithelial types significant (colonocyte
+    assoc_mcp=0.003, epithelial progenitor 0.002); ALL immune types negative/null;
+    0/28706 cells FDR<0.1.
+  - MHC-INCLUDED: B cell / dendritic / monocyte-macrophage top-enriched
+    (assoc_mcp=0.001, assoc_mcz 5-7.3); 341/28706 cells FDR<0.1. APC-biased
+    (HLA class II); T cell and plasma NOT enriched (largest populations).
+  Implication: the locked MHC-exclusion choice materially changes cell-type
+  attribution. Revisit whether v1 headline runs should report MHC-included, or
+  report both, for cross-atlas cell-type conclusions. FLAG for M-level review.
+
+PIPELINE PORTABILITY DEBT (committed scripts assume HB+SLURM; broke on bare VM):
+  - GWAS files: download_refs.sh fetches RAW de Lange (chr:pos IDs, no rsID) but
+    01_magma expects HARMONISED (hm_rsid). Fixed: fetch GWAS-Catalog harmonised
+    (de Lange 28067908-GCST004133-EFO_0000729.h.tsv.gz; Liu GCST90446794.h.tsv.gz).
+    Liu N_FIXED placeholder 999999 -> 375508. Liu passed sanity only at top-n=100
+    (HLA-saturated; JAK2/FCGR2A ranks 48/90) — flag for de Lange vs Liu concordance.
+  - 01_magma.slurm hardcoded de Lange col names; different per GWAS. Refactored to
+    per-trait COL_SNP/CHR/BP/P vars. SCZ arm = FIXME (unfetched).
+  - Garrido source: RAW.tar from GEO (GSE214695), NOT CELLxGENE b1a62801 deposit
+    (synthetic barcodes, per correction 9). Loader has no CLI driver / no covariate
+    writer — wrote code/02_atlas_prep/run_garrido_load.py. Cell count 29675 vs
+    locked 30068 (~1.3% delta, tripwire only) — reconcile before headline Garrido.
+  - Covariates: sex UNAVAILABLE in GSE214695 (not in RAW.tar or annotation CSV);
+    sample == donor (1:1). Effective cov set = log_n_genes, log_n_counts, donor.
+    Deviates from locked (log_n_genes, log_n_counts, donor, sample, sex).
+  - scdrs 1.0.2 vs modern pandas/numpy — FIVE breaks: hyphen flags (needs underscore),
+    species positionals required, NO seed flag (seed=42 policy unenforceable via CLI;
+    Python API only), get_dummies emits bool -> object dtype -> np.linalg.solve cast
+    error (must pre-numericize cov file to float64), CLI doesn't mkdir out-folder.
+    03_scdrs_compute.slurm will NOT run as-committed on this stack.
+  - perform-downstream: 'connectivities not found' -> hetero_mcp unreliable without
+    sc.pp.neighbors; assoc results valid.

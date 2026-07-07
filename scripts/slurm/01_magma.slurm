@@ -46,6 +46,7 @@ case "${GWAS:-}" in
     INPUT="$UCC_DATA/gwas/uc_delange_harmonised.tsv.gz"
     OUT_PREFIX="$UCC_DATA/gwas/uc_delange"
     N_FIXED=45975                # 12,366 cases + 33,609 controls
+    COL_SNP=hm_rsid; COL_CHR=hm_chrom; COL_BP=hm_pos; COL_P=p_value
     TRAIT_CLASS=uc
     TRAIT=UC
     ;;
@@ -54,7 +55,8 @@ case "${GWAS:-}" in
     OUT_PREFIX="$UCC_DATA/gwas/uc_liu"
     # FILL IN combined N from Liu 2023 paper at M1, OR pass --col-n if
     # the file includes a per-SNP N column (preferred — DECISIONS.md).
-    N_FIXED=999999
+    N_FIXED=375508
+    COL_SNP=rsid; COL_CHR=chromosome; COL_BP=base_pair_location; COL_P=p_value
     TRAIT_CLASS=uc
     TRAIT=UC
     ;;
@@ -63,6 +65,7 @@ case "${GWAS:-}" in
     OUT_PREFIX="$UCC_DATA/gwas/scz_trubetskoy"
     # 76,755 cases + 53,880 controls; verify exact N at M1
     N_FIXED=130635
+    COL_SNP=FIXME; COL_CHR=FIXME; COL_BP=FIXME; COL_P=FIXME
     TRAIT_CLASS=schizophrenia
     TRAIT=SCZ
     ;;
@@ -79,8 +82,8 @@ echo "[01_magma] GWAS=$GWAS  input=$INPUT"
 python code/01_magma/prepare_gwas.py \
     --input "$INPUT" \
     --out-prefix "$OUT_PREFIX" \
-    --col-snp hm_rsid --col-chr hm_chrom --col-bp hm_pos \
-    --col-p p_value --n-fixed "$N_FIXED" \
+    --col-snp "$COL_SNP" --col-chr "$COL_CHR" --col-bp "$COL_BP" \
+    --col-p "$COL_P" --n-fixed "$N_FIXED" \
     --lambda-gc-out "$UCC_RESULTS/magma/${GWAS}_lambda_gc.tsv"
 
 # ---- 2. MAGMA annotate + gene-test ---------------------------------------
