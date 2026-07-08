@@ -1,0 +1,26 @@
+# Python 2.7 env for LDSC itself (bulik/ldsc requires Python 2.7).
+#
+# The wrappers in this module (munge_for_ldsc.py, run_ldsc_h2.py,
+# parse_log.py) run in the main `uc-cross-atlas` Python 3.10 env and
+# call into LDSC via subprocess. This env is ONLY for hosting LDSC's
+# munge_sumstats.py + ldsc.py. Activate it inside WSL before invoking
+# the LDSC scripts directly.
+#
+# Pin notes:
+#   - Python 2.7 is EOL upstream but LDSC has not been ported.
+#   - numpy / scipy / pandas versions match LDSC's documented
+#     requirements (its setup.py lists numpy>=1.16, pandas>=0.20,
+#     scipy>=1.0.0 — newer versions break Cython compat).
+#   - bitarray is LDSC's only non-stdlib non-numerics dep.
+name: uc-cross-atlas-ldsc
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=2.7
+  - numpy=1.16.6
+  - pandas=0.20.3
+  - scipy=1.2.1
+  - bitarray=0.8.1
+  - nose=1.3.7  # LDSC's own test runner
+  - pip

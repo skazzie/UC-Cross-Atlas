@@ -1,0 +1,24 @@
+# R-side env for seismicGWAS on the Windows laptop — minimal subset.
+#
+# First-attempt full env failed to solve in 5.5 min (bioconda windows
+# builds of bioconductor packages don't exist or conflict). Strategy:
+# conda installs only base R + dev tooling + tidyverse + arrow;
+# bioconductor packages (SingleCellExperiment, zellkonverter,
+# EmpiricalBrownsMethod) are deferred to BiocManager::install() at
+# Rscript time. seismicGWAS itself comes from GitHub via remotes.
+#
+# Isolated from the Python `uc-cross-atlas` env per the same discipline
+# as the LDSC Py 2.7 env — R deps live alongside the main Python env,
+# not inside it.
+name: uc-cross-atlas-r
+channels:
+  - conda-forge
+dependencies:
+  - r-base>=4.3
+  - r-essentials
+  - r-devtools
+  - r-remotes
+  - r-tidyverse
+  - r-biocmanager
+  - r-arrow      # feather IO, matches Python side
+  - r-optparse   # needed by code/04_seismic/run_seismic.R

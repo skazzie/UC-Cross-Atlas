@@ -91,7 +91,9 @@ def main():
     # data[(method, gwas, tier)][atlas] = (scores, pvals, qvals, n_cells)
     data = defaultdict(dict)
     for entry in args.input:
-        parts = entry.split(":")
+        # rsplit so Windows paths (e.g. "C:\Users\...\foo.tsv:atlas:method:gwas:tier")
+        # parse correctly — the path part may itself contain a colon.
+        parts = entry.rsplit(":", 4)
         if len(parts) != 5:
             raise SystemExit(f"Bad --input entry (need PATH:ATLAS:METHOD:GWAS:TIER): {entry}")
         path, atlas, method, gwas, tier = parts

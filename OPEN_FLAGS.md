@@ -4,9 +4,111 @@ Running list of judgment calls and unresolved questions surfaced during the buil
 not yet decided. The companion to DECISIONS.md: that file is *locked* decisions, this is
 the *still-open* side. When a flag is resolved, log it in DECISIONS.md and strike it here.
 
-_Last updated: June 7, 2026._
+_Last updated: June 27, 2026._
 
 ---
+
+## F11 · Controls-interpretation gate — scDRS T-cell-bottom may be methods baseline (NEW 2026-06-27)
+**Track [3] is executed-but-interpretation-open, not closed.** Per
+DECISIONS 30(a): the SCZ + Yengo height runs landed but the
+side-by-side ranking reveals scDRS bottom-3 crosstalk between UC and
+Height (T cell: UC rank 15, Height rank 14; NK/ILC: UC 13, Height 15;
+UC vs Height Spearman ρ = +0.34 in scDRS). The "bulk T cell not
+prioritized" claim in UC is therefore partially confounded by methods
+baseline on this single atlas. seismic does NOT show the same
+crosstalk (UC vs Height ρ = +0.04; T cell mid-ranked) — the
+scDRS-vs-seismic divergence is itself a cross-method result.
+
+Reproducible artifact: `results/concordance/controls_sidebyside_broad.{csv,md,json}`,
+generator `code/06_concordance/controls_sidebyside_broad.py`.
+
+**APC-up survives the controls test** (UC-specific in both methods)
+and is NOT under this flag — only the T-cell-bottom claim is.
+
+Resolution path: **IBDverse cross-check is now load-bearing** as
+external adjudicator for the scDRS-vs-seismic T-cell-bottom
+disagreement. Until IBDverse adjudicates (or Smillie/TAURUS replicate
+once HB lands), the T-cell-bottom finding cannot be claimed as UC
+biology in any manuscript paragraph.
+
+- **Bites at:** any manuscript paragraph that calls T-cell-bottom a UC
+  finding. Sits upstream of the whole UC-interpretation section.
+
+## F12 · Cross-atlas fine-tier concordance is pending P3 data, NOT absent by design (NEW 2026-06-27, REFRAMED)
+**Current-state limitation, not a design choice.** v1 figures report
+cross-atlas concordance at the broad tier only because the F8
+fine-tier work (14-bucket vocab, per-atlas fine panels, fine-tier
+concordance) is the **P3 tail** — coded but not yet computed
+against real data. The 14-bucket vocab IS designed to support
+cross-atlas fine concordance.
+
+What IS structurally limited (the narrow truth):
+- **Native fine labels do not harmonize across atlases.** Native
+  CD4 ANXA1 vs CD4+ Memory vs CD4 TRM are study-specific subtype
+  boundaries. A claim like "X-specific T subset is bottom across
+  atlases" using NATIVE labels is not constructible.
+- This is exactly why the F8 14-bucket fine vocab exists — to
+  define cross-atlas-alignable fine buckets that DO harmonize. Once
+  per-atlas fine panels run on real data, the cross-atlas fine
+  concordance figure follows naturally at the 14-bucket level.
+
+What the manuscript should say (NOT "we only do broad by design"):
+> Cross-atlas fine-tier concordance is reported at the 14 F8 fine
+> buckets, which are designed to be cross-atlas-alignable while
+> native fine labels are study-specific. The v1 figures present
+> broad-tier cross-atlas concordance; fine-tier cross-atlas panels
+> appear in [Supplementary Figure N] alongside per-atlas native
+> fine panels.
+
+The bulk-T-cell-bottom claim (assuming it survives F11 / DECISIONS
+30(a) adjudication) cannot be refined to a NATIVE T-subset
+cross-atlas, but CAN be refined to an F8 fine bucket (e.g.
+`t_cell_broad` is the only F8 bucket on the T branch in v1 — single
+T fine bucket is itself a v1-scope limitation, expandable in v2).
+
+- **Bites at:** manuscript framing — must say "pending data" not
+  "absent by design" so a reviewer doesn't read structural
+  constraint where there is only computational backlog. DECISIONS
+  30(b) item 1 ("No fine-tier cross-atlas concordance figure exists
+  in v1 by design") is amended by DECISIONS 30(b) addendum (this
+  flag): the v1-scope absence is by **scope**, not **design**.
+
+## F13 · Pan-GI is the single granulocyte anchor — flag as Pan-GI-singleton in figures (NEW 2026-06-27)
+**Figure-construction note.** Per the 2026-06-27 crosswalk drafts,
+the `granulocyte` bucket has only ONE atlas as a confirmed source:
+
+| Atlas | granulocyte status |
+|---|---|
+| Pan-GI | yes — Neutrophils native label (confirmed) |
+| Garrido | yes — Neutrophil 1/2/3 + Eosinophils (confirmed) |
+| Smillie | structural zero (taxonomy lacks granulocytes; DECISIONS 22) |
+| TAURUS | structural zero suspected (mucosal biopsy + droplet 10x) |
+| HCA Gut | uncertain (myeloid extraction thin from PMC excerpt) |
+
+Cross-atlas concordance for the `granulocyte` row in the 5×5 broad
+heatmap is therefore Pan-GI + Garrido at best — at worst, Pan-GI
+talking to itself if HCA's bucket turns out empty on first HB load.
+**Anything that bucket "reproduces" across atlases is mechanically
+the Pan-GI / Garrido pairwise number, not a five-atlas concordance.**
+
+Same trap as the donor-overlap issue (Pan-GI re-indexes Smillie+Kong
+donors per DECISIONS 3/7) — a result that looks cross-source but is
+actually one source talking to itself.
+
+Resolution / mitigation:
+- **Figure marker**: mark the `granulocyte` row in the 5×5 heatmap
+  with an explicit "single-anchor" / "single-source" annotation;
+  do NOT report a cross-atlas ρ for it as if it were five-atlas.
+- **Methods sentence**: explicitly note granulocyte cells are
+  technically absent from droplet-10x mucosal-biopsy atlases
+  (Smillie / TAURUS) and that Pan-GI is the cross-atlas anchor.
+- **Same treatment may apply** to `lymphatic_endothelial` (HCA Gut
+  + Pan-GI dominant; TAURUS likely lumped into "Vascular"; Garrido
+  + Smillie one native label each) — verify on HB load and flag if
+  similarly single-anchored.
+
+- **Bites at:** 5×5 broad cross-atlas heatmap row construction;
+  Methods paragraph on cross-atlas coverage.
 
 ## ~~F1 · UC tissue definition — inflamed vs non-inflamed~~ — RESOLVED 2026-06-07 (DECISIONS 26, 27(b))
 Locked: **pool all UC cells for the first 3×3 broad heatmap** (inflamed
