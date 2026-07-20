@@ -14,6 +14,13 @@ def main():
     a = p.parse_args()
 
     adata = load(a.tar, a.csv)                      # apply_v1_filter=True default
+
+    # Precompute PCA + kNN graph so scDRS perform-downstream --group-analysis
+    # skips its ~45-min rebuild (scdrs_cli.py:669 checks obsp['connectivities']).
+    # Params match scDRS group-analysis defaults (knn_n_pcs=20, knn_n_neighbors=15).
+    sc.pp.pca(adata, n_comps=20)
+    sc.pp.neighbors(adata, n_neighbors=15, n_pcs=20)
+
     adata.write_h5ad(a.out_h5ad)
     print(f"[driver] wrote {a.out_h5ad}: {adata.n_obs} cells x {adata.n_vars} genes")
 
