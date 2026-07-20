@@ -3376,3 +3376,21 @@ CONCLUSION: locked v1 MHC-exclusion default inverts UC cell-type attribution fro
   report MHC-included, or both, for cross-atlas cell-type conclusions.
 CAVEATS: Garrido only (N=1 atlas); depth+donor-corrected, sex unavailable (not
   headline config); scdrs 1.0.2 group hetero_mcp unreliable (no kNN graph).
+
+## SESSION 2026-07-07 (cont.): MHC-exclusion 2x2 REPLICATES on Smillie (PRIMARY atlas)
+Smillie (SCP259, 365,492 cells, 30 donors) x de Lange x {MHC-excl, MHC-incl}
+x {full-cov 164col (donor+133 sample dummies), donor-only 32col}. cell_type_broad.
+RESULT — inversion replicates, both cov versions:
+  MHC-EXCLUDED: colonocyte + epithelial progenitor top (mcz ~3.2-3.8); APCs null.
+  MHC-INCLUDED: B cell / dendritic / monocyte-macrophage top (mcz +6.4 to +9.7);
+    epithelium marginal.
+  Full-cov vs donor-only give SAME compartment answer -> the 133 sample dummies
+    (which bundle Epi/LP compartment) do NOT scrub signal. Full-cov validated;
+    donor-only is the robustness check. Report full-cov (spec-compliant).
+  Smillie APC enrichment STRONGER than Garrido (B +9.32 vs +7.29) — larger atlas.
+DIVERGENCE FROM GARRIDO: T cell NOT strongly negative on Smillie (mid-pack ~+0.4,
+  vs -2.6 on Garrido). T-cell depletion is ATLAS-SPECIFIC, not part of the general
+  claim. The APC<->epithelial inversion is what replicates; T-cell specifics do not.
+STATUS: MHC-exclusion inversion now confirmed on 2 atlases (Garrido, Smillie) x
+  2 GWAS (de Lange, Liu) x cov-robust. Solid for M-level MHC-policy escalation.
+CAVEAT: depth+donor(+sample) corrected, sex unavailable in SCP259 metadata.
