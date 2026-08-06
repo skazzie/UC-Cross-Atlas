@@ -7,13 +7,23 @@ our sudo-less GCP VM. This script sidesteps the whole chain: read the
 h5ad in the conda env with anndata, drop flat files, and hand off to
 sce_from_export.R (pure R, no Python called).
 
-Seismic wants RAW counts for specificity. Our atlas h5ads carry raw
-counts in layers['counts'] and log1p in X, so we export layers['counts']
-and refuse to fall back to X (would silently feed log-normalized values
-into calc_specificity).
+Our atlas h5ads carry raw counts in layers['counts'] and log1p(CP10k)
+in X. We export BOTH:
+  - counts.mtx from layers['counts'] (raw), so a `counts` assay is
+    available for anything that expects raw.
+  - logcounts.mtx from X (log1p(CP10k)), so seismic's calc_specificity
+    (which defaults to assay_name="logcounts") consumes the SAME
+    normalization our scDRS runs use. Keeping the two methods on
+    identical input means cross-method concordance reflects method
+    differences, not normalization differences.
+We refuse to fall back to X for counts (would silently feed
+log-normalized values into anything expecting raw).
 
 Outputs (in --out-dir):
   counts.mtx     scipy MatrixMarket, cells x genes, raw integer counts
+                 (from layers['counts'])
+  logcounts.mtx  scipy MatrixMarket, cells x genes, log1p(CP10k) values
+                 (from adata.X)
   genes.tsv      one gene symbol per line, no header (matches barcodes.tsv)
   barcodes.tsv   one cell id per line, no header, row-aligned with counts.mtx
   obs.tsv        cell metadata with header; first column 'cell_id' is the
@@ -76,6 +86,21 @@ def main() -> int:
         flush=True,
     )
     scipy.io.mmwrite(str(args.out_dir / "counts.mtx"), counts, field="integer")
+
+    # X is log1p(CP10k) in our atlases — the same normalization scDRS
+    # consumes. Exporting it as logcounts.mtx lets seismic's
+    # calc_specificity(assay_name="logcounts") run on identical input,
+    # so cross-method concordance isolates method effects from
+    # normalization effects.
+    logcounts = adata.X
+    if not sp.issparse(logcounts):
+        logcounts = sp.csr_matrix(logcounts)
+    print(
+        f"[h5ad_to_sce_export] writing logcounts.mtx ({logcounts.nnz:,} nnz, "
+        f"cells x genes)",
+        flush=True,
+    )
+    scipy.io.mmwrite(str(args.out_dir / "logcounts.mtx"), logcounts, field="real")
 
     barcodes_path = args.out_dir / "barcodes.tsv"
     barcodes_path.write_text("\n".join(adata.obs_names.astype(str)) + "\n")

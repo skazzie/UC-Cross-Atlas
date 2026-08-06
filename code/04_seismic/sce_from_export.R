@@ -2,13 +2,17 @@
 # sce_from_export.R — assemble a SingleCellExperiment from the flat-file
 # export produced by h5ad_to_sce_export.py, then serialize to .rds.
 #
-# Pure R: reads counts.mtx via Matrix::readMM, no reticulate, no basilisk,
-# no zellkonverter. This is the second stage of the seismic pipeline's
-# h5ad-bypass path (Python exports flat → R builds SCE + saves .rds →
-# run_seismic reads .rds).
+# Pure R: reads counts.mtx + logcounts.mtx via Matrix::readMM, no
+# reticulate, no basilisk, no zellkonverter. This is the second stage of
+# the seismic pipeline's h5ad-bypass path (Python exports flat → R
+# builds SCE + saves .rds → run_seismic reads .rds).
 #
-# The primary and only assay is `counts` (raw). Seismic's calc_specificity
-# expects raw counts; we intentionally do not synthesize logcounts here.
+# Assays: `counts` (raw, from layers['counts']) and `logcounts`
+# (log1p(CP10k), from adata.X). seismicGWAS::calc_specificity defaults
+# to assay_name="logcounts", so exporting the same log1p(CP10k)
+# normalization scDRS consumes keeps both methods on identical input —
+# cross-method concordance then reflects method differences, not
+# normalization differences.
 #
 # CLI:
 #   Rscript code/04_seismic/sce_from_export.R \
@@ -48,24 +52,32 @@ build_sce_from_export <- function(export_dir) {
                  paste(colnames(obs), collapse = ", ")))
   }
 
-  # counts.mtx is cells x genes (Python/AnnData orientation). SCE expects
-  # genes x cells — transpose after reading.
-  counts <- Matrix::readMM(file.path(export_dir, "counts.mtx"))
-  if (nrow(counts) != length(barcodes) || ncol(counts) != length(genes)) {
-    stop(sprintf("counts.mtx shape (%d x %d) doesn't match cells x genes (%d x %d)",
-                 nrow(counts), ncol(counts),
-                 length(barcodes), length(genes)))
+  # Both .mtx files are cells x genes (Python/AnnData orientation).
+  # SCE expects genes x cells — transpose after reading.
+  read_assay <- function(fname) {
+    m <- Matrix::readMM(file.path(export_dir, fname))
+    if (nrow(m) != length(barcodes) || ncol(m) != length(genes)) {
+      stop(sprintf("%s shape (%d x %d) doesn't match cells x genes (%d x %d)",
+                   fname, nrow(m), ncol(m),
+                   length(barcodes), length(genes)))
+    }
+    m <- Matrix::t(m)
+    rownames(m) <- genes
+    colnames(m) <- barcodes
+    m
   }
-  counts <- Matrix::t(counts)
-  rownames(counts) <- genes
-  colnames(counts) <- barcodes
 
+  counts    <- read_assay("counts.mtx")
+  logcounts <- read_assay("logcounts.mtx")
+
+  # calc_specificity defaults to assay_name="logcounts", so `logcounts`
+  # must be present. `counts` kept for any raw-count consumer.
   sce <- SingleCellExperiment(
-    assays  = list(counts = counts),
+    assays  = list(counts = counts, logcounts = logcounts),
     colData = S4Vectors::DataFrame(obs),
     rowData = S4Vectors::DataFrame(gene = genes, row.names = genes)
   )
-  message(sprintf("[sce_from_export] built SCE: %d cells x %d genes (assay: counts)",
+  message(sprintf("[sce_from_export] built SCE: %d cells x %d genes (assays: counts, logcounts)",
                   ncol(sce), nrow(sce)))
   sce
 }
