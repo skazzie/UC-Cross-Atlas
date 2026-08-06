@@ -35,8 +35,9 @@
 #      cell_type_<tier> column.
 #   2. calc_specificity on the SCE (recomputed every run — a few minutes;
 #      no on-disk cache, which lost gene rownames through feather).
-#   3. Regression with explicit confounders (gene_length_log, ld_score,
-#      transcript_count) — overrides package defaults if they differ.
+#   3. Regression via get_ct_trait_associations with magma_gene_col=SYMBOL,
+#      magma_z_col=ZSTAT (our MAGMA tables use those column names). The
+#      1.0.0 API takes no `confounders` argument — passing one errors.
 #   4. Write headline TSV: cell_type, pvalue, FDR, n_cells.
 #   5. Optional (--run-permutations): shuffle gene-Z M times, save
 #      per-permutation -log10(pvalue) as long-format feather.
@@ -150,16 +151,22 @@ message(sprintf("[seismic] specificity done in %s",
 
 # ---- 3. Regression --------------------------------------------------------
 
-# Confounders verification — DECISIONS.md requires the explicit triple
-# (gene length, gene-gene LD, transcript count). If package defaults
-# differ we override. See code/04_seismic/README.md §Confounders.
-CONFOUNDERS <- c("gene_length_log", "ld_score", "transcript_count")
+# seismicGWAS 1.0.0 signature:
+#   get_ct_trait_associations(sscore, magma,
+#     magma_gene_col = "GENE", magma_z_col = "ZSTAT", model = "linear")
+# There is NO `confounders` argument in 1.0.0 — passing one errors out
+# with "unused argument". Our MAGMA gene-Z tables use SYMBOL/ZSTAT
+# columns (see code/01_magma/make_scdrs_gs.py), so we override
+# magma_gene_col to match. Confounder adjustment tracked separately in
+# DECISIONS.md; not enforceable through this API version.
 
 magma_z <- read.table(opt[["magma-z"]], header = TRUE, sep = "\t",
                        stringsAsFactors = FALSE)
 
 run_regression <- function(spec, mz) {
-  get_ct_trait_associations(spec, mz, confounders = CONFOUNDERS)
+  get_ct_trait_associations(spec, mz,
+                            magma_gene_col = "SYMBOL",
+                            magma_z_col    = "ZSTAT")
 }
 
 res <- run_regression(spec_obj, magma_z)
