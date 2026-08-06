@@ -3,17 +3,26 @@
 #
 # Spec: code/04_seismic/README.md and DECISIONS.md.
 #
-# CLI:
+# CLI (either --sce-rds OR --h5ad-path is required):
+#   # Preferred on the GCP VM (bypasses zellkonverter/basilisk):
 #   Rscript code/04_seismic/run_seismic.R \
 #     --atlas garrido_trigo --gwas delange --tier broad \
-#     --h5ad-path data/atlases/garrido_trigo.h5ad \
+#     --sce-rds data/atlases/garrido_trigo.sce.rds \
 #     --magma-z results/magma/delange_gene_z.tsv \
 #     --out-dir results/seismic \
 #     --permutations 1000 \
 #     --seed 42
 #
+#   # Legacy (needs a working zellkonverter/basilisk install):
+#   Rscript code/04_seismic/run_seismic.R \
+#     --atlas garrido_trigo --gwas delange --tier broad \
+#     --h5ad-path data/atlases/garrido_trigo.h5ad \
+#     ...
+#
 # Behaviour:
-#   1. Load h5ad as SCE via zellkonverter; validate cell_type_<tier> column.
+#   1. Load SCE — from --sce-rds via readRDS (pure R, no basilisk) OR
+#      from --h5ad-path via zellkonverter::readH5AD. Validate
+#      cell_type_<tier> column.
 #   2. Compute (and cache) per-atlas specificity in long format.
 #   3. Regression with explicit confounders (gene_length_log, ld_score,
 #      transcript_count) — overrides package defaults if they differ.
@@ -27,7 +36,6 @@ suppressPackageStartupMessages({
   library(optparse)
   library(seismicGWAS)
   library(SingleCellExperiment)
-  library(zellkonverter)
   library(arrow)
 })
 
@@ -38,7 +46,10 @@ option_list <- list(
   make_option("--gwas",         type = "character"),
   make_option("--tier",         type = "character", default = "broad",
               help = "broad or fine"),
-  make_option("--h5ad-path",    type = "character"),
+  make_option("--sce-rds",      type = "character",
+              help = "Pre-built SingleCellExperiment .rds (preferred; pure R load)."),
+  make_option("--h5ad-path",    type = "character",
+              help = "h5ad file (requires working zellkonverter/basilisk)."),
   make_option("--magma-z",      type = "character"),
   make_option("--out-dir",      type = "character", default = "results/seismic"),
   make_option("--permutations", type = "integer",   default = 1000L),
@@ -51,10 +62,16 @@ option_list <- list(
 
 opt <- parse_args(OptionParser(option_list = option_list))
 
-required <- c("atlas", "gwas", "tier", "h5ad-path", "magma-z")
+required <- c("atlas", "gwas", "tier", "magma-z")
 missing <- required[vapply(required, function(x) is.null(opt[[x]]), logical(1))]
 if (length(missing) > 0) {
   stop("Missing required arguments: ", paste(missing, collapse = ", "))
+}
+if (is.null(opt[["sce-rds"]]) && is.null(opt[["h5ad-path"]])) {
+  stop("Must provide either --sce-rds (preferred) or --h5ad-path.")
+}
+if (!is.null(opt[["sce-rds"]]) && !is.null(opt[["h5ad-path"]])) {
+  stop("Provide exactly one of --sce-rds or --h5ad-path, not both.")
 }
 
 require_path <- function(p, descr) {
@@ -63,7 +80,8 @@ require_path <- function(p, descr) {
     quit(status = 2)
   }
 }
-require_path(opt[["h5ad-path"]], "h5ad")
+if (!is.null(opt[["sce-rds"]]))  require_path(opt[["sce-rds"]],  "SCE .rds")
+if (!is.null(opt[["h5ad-path"]])) require_path(opt[["h5ad-path"]], "h5ad")
 require_path(opt[["magma-z"]],   "MAGMA gene-Z TSV")
 
 dir.create(opt[["out-dir"]], recursive = TRUE, showWarnings = FALSE)
@@ -78,9 +96,19 @@ message(sprintf("[seismic] atlas=%s gwas=%s tier=%s perm=%d seed=%d",
                 opt$atlas, opt$gwas, opt$tier,
                 opt$permutations, opt$seed))
 
-# ---- 1. Load h5ad as SCE --------------------------------------------------
+# ---- 1. Load SCE ---------------------------------------------------------
 
-sce <- readH5AD(opt[["h5ad-path"]])
+if (!is.null(opt[["sce-rds"]])) {
+  message(sprintf("[seismic] readRDS %s", opt[["sce-rds"]]))
+  sce <- readRDS(opt[["sce-rds"]])
+} else {
+  # zellkonverter drags in basilisk, which on our sudo-less VM tries to
+  # source-build Python 3.14 and dies. Only load it on the path where we
+  # actually need it.
+  message(sprintf("[seismic] zellkonverter::readH5AD %s", opt[["h5ad-path"]]))
+  suppressPackageStartupMessages(library(zellkonverter))
+  sce <- readH5AD(opt[["h5ad-path"]])
+}
 ct_col <- paste0("cell_type_", opt$tier)
 if (!(ct_col %in% colnames(colData(sce)))) {
   stop(sprintf("colData(sce) has no '%s' column. Available: %s",
