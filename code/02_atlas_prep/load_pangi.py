@@ -73,8 +73,11 @@ def load(
             "(see DECISIONS.md correction 2026-05-20 (5/7))."
         )
 
-    logger.info("Reading %s", h5ad_path)
-    adata = ad.read_h5ad(h5ad_path)
+    # Backed read: obs is materialized but X stays on disk, so we can
+    # apply the v1 filter before pulling the colon-UC subset into RAM.
+    # An unbacked read of the full 1.6M-cell Pan-GI h5ad OOMs the 64GB VM.
+    logger.info("Reading %s (backed='r')", h5ad_path)
+    adata = ad.read_h5ad(h5ad_path, backed="r")
 
     missing = [c for c in EXPECTED_OBS_COLS if c not in adata.obs.columns]
     if missing:
@@ -90,10 +93,22 @@ def load(
             & (adata.obs["sample_type"] != EXCLUDE_SAMPLE_TYPE)
         )
         n_drop = int((~m).sum())
-        adata = adata[m].copy()
+        n_keep = int(m.sum())
+        logger.info(
+            "Pan-GI v1 filter: materializing %d of %d cells via .to_memory()",
+            n_keep,
+            adata.n_obs,
+        )
+        adata = adata[m.values].to_memory()
         logger.info(
             "Pan-GI v1 filter: dropped %d cells, kept %d", n_drop, adata.n_obs
         )
+    else:
+        logger.warning(
+            "apply_v1_filter=False: materializing all %d cells; may OOM.",
+            adata.n_obs,
+        )
+        adata = adata.to_memory()
 
     obs = adata.obs
     obs["cell_type_broad"] = obs["level_2_annot"].astype("category")
