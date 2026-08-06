@@ -1,5 +1,11 @@
 #!/usr/bin/env Rscript
-# run_seismic.R — seismicGWAS regime-1 pipeline for one (atlas, GWAS, tier).
+# run_seismic.R — seismicGWAS pipeline for one (atlas, GWAS, tier).
+#
+# Writes <out-dir>/<atlas>_<gwas>_<tier>.tsv with columns:
+#   cell_type, pvalue, FDR, n_cells
+#
+# seismicGWAS 1.0.0's get_ct_trait_associations returns only cell_type,
+# pvalue, FDR — no coefficient/se/n_genes. This driver targets that API.
 #
 # Spec: code/04_seismic/README.md and DECISIONS.md.
 #
@@ -10,7 +16,6 @@
 #     --sce-rds data/atlases/garrido_trigo.sce.rds \
 #     --magma-z results/magma/delange_gene_z.tsv \
 #     --out-dir results/seismic \
-#     --permutations 1000 \
 #     --seed 42
 #
 #   # Legacy (needs a working zellkonverter/basilisk install):
@@ -19,18 +24,24 @@
 #     --h5ad-path data/atlases/garrido_trigo.h5ad \
 #     ...
 #
+#   Optional (off by default so the headline TSV writes reliably):
+#     --run-retest         re-run regression, spearman(-log10 p) >= 0.999
+#     --run-permutations   M shuffles of gene-Z, per-perm -log10(p) feather
+#     --permutations INT   M value when --run-permutations is set (default 1000)
+#
 # Behaviour:
 #   1. Load SCE — from --sce-rds via readRDS (pure R, no basilisk) OR
 #      from --h5ad-path via zellkonverter::readH5AD. Validate
 #      cell_type_<tier> column.
-#   2. Compute (and cache) per-atlas specificity in long format.
+#   2. calc_specificity on the SCE (recomputed every run — a few minutes;
+#      no on-disk cache, which lost gene rownames through feather).
 #   3. Regression with explicit confounders (gene_length_log, ld_score,
 #      transcript_count) — overrides package defaults if they differ.
-#   4. Write headline TSV: cell_type, coefficient, se, pvalue, n_genes, n_cells.
-#   5. M=permutations of the gene-Z vector; per-permutation coefficients
-#      saved as long-format feather.
-#   6. Test-retest gate: re-run regression with identical inputs; assert
-#      spearman correlation of coefficients >= 0.999.
+#   4. Write headline TSV: cell_type, pvalue, FDR, n_cells.
+#   5. Optional (--run-permutations): shuffle gene-Z M times, save
+#      per-permutation -log10(pvalue) as long-format feather.
+#   6. Optional (--run-retest): re-run regression with identical inputs;
+#      assert spearman correlation of -log10(pvalue) >= 0.999.
 
 suppressPackageStartupMessages({
   library(optparse)
@@ -52,12 +63,18 @@ option_list <- list(
               help = "h5ad file (requires working zellkonverter/basilisk)."),
   make_option("--magma-z",      type = "character"),
   make_option("--out-dir",      type = "character", default = "results/seismic"),
-  make_option("--permutations", type = "integer",   default = 1000L),
+  make_option("--permutations", type = "integer",   default = 1000L,
+              help = "M value used only when --run-permutations is set."),
   make_option("--seed",         type = "integer",   default = 42L),
-  make_option("--recompute-spec", action = "store_true", default = FALSE,
-              help = "Force recomputation of the cached specificity table."),
+  make_option("--run-permutations", action = "store_true", default = FALSE,
+              help = "Run M gene-Z shuffles (default off; headline TSV only)."),
+  make_option("--run-retest", action = "store_true", default = FALSE,
+              help = "Run test-retest reproducibility gate (default off)."),
+  # Kept for backward compat with existing slurm callers; no effect.
   make_option("--skip-permutations", action = "store_true", default = FALSE,
-              help = "Skip the M=permutations Brown null draws (debug only).")
+              help = "Deprecated no-op; permutations are opt-in via --run-permutations."),
+  make_option("--recompute-spec", action = "store_true", default = FALSE,
+              help = "Deprecated no-op; specificity is always recomputed.")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -85,16 +102,16 @@ if (!is.null(opt[["h5ad-path"]])) require_path(opt[["h5ad-path"]], "h5ad")
 require_path(opt[["magma-z"]],   "MAGMA gene-Z TSV")
 
 dir.create(opt[["out-dir"]], recursive = TRUE, showWarnings = FALSE)
-spec_dir <- file.path(opt[["out-dir"]], "..", "..",
-                      "code", "04_seismic", "specificity_long")
-dir.create(spec_dir, recursive = TRUE, showWarnings = FALSE)
 perm_dir <- file.path(opt[["out-dir"]], "permutations")
-dir.create(perm_dir, recursive = TRUE, showWarnings = FALSE)
+if (isTRUE(opt[["run-permutations"]])) {
+  dir.create(perm_dir, recursive = TRUE, showWarnings = FALSE)
+}
 
 t0 <- Sys.time()
-message(sprintf("[seismic] atlas=%s gwas=%s tier=%s perm=%d seed=%d",
-                opt$atlas, opt$gwas, opt$tier,
-                opt$permutations, opt$seed))
+message(sprintf("[seismic] atlas=%s gwas=%s tier=%s seed=%d run_perm=%s run_retest=%s",
+                opt$atlas, opt$gwas, opt$tier, opt$seed,
+                isTRUE(opt[["run-permutations"]]),
+                isTRUE(opt[["run-retest"]])))
 
 # ---- 1. Load SCE ---------------------------------------------------------
 
@@ -117,33 +134,19 @@ if (!(ct_col %in% colnames(colData(sce)))) {
 message(sprintf("[seismic] loaded %d cells x %d genes",
                 ncol(sce), nrow(sce)))
 
-# ---- 2. Specificity (cached per atlas x tier) -----------------------------
+# ---- 2. Specificity -------------------------------------------------------
 
-spec_path <- file.path(
-  spec_dir,
-  paste0(opt$atlas, "_", opt$tier, "_specificity.feather")
-)
-
-if (file.exists(spec_path) && !opt[["recompute-spec"]]) {
-  message(sprintf("[seismic] specificity cache hit: %s", spec_path))
-  spec_long <- arrow::read_feather(spec_path)
-  spec_obj <- spec_long  # downstream API may differ; see note below
-} else {
-  message("[seismic] computing specificity (this can take several minutes)")
-  spec_obj <- calc_specificity(sce, ct_label_col = ct_col)
-  # Reshape to long format: atlas, granularity, cell_type, gene, specificity.
-  spec_mat <- as.matrix(spec_obj)
-  spec_long <- data.frame(
-    atlas       = opt$atlas,
-    granularity = opt$tier,
-    cell_type   = rep(colnames(spec_mat), each = nrow(spec_mat)),
-    gene        = rep(rownames(spec_mat), times = ncol(spec_mat)),
-    specificity = as.numeric(spec_mat),
-    stringsAsFactors = FALSE
-  )
-  spec_long <- spec_long[spec_long$specificity != 0, ]
-  arrow::write_feather(spec_long, spec_path)
-}
+# No on-disk cache: the prior feather round-trip stored specificity as a
+# long-format data.frame with a `gene` column, but on cache hit the code
+# assigned that data.frame straight to spec_obj — losing the wide-matrix
+# shape and rownames that get_ct_trait_associations needs for gene
+# overlap. Result was a 1-gene overlap and check_overlap failure.
+# Recomputing is a few minutes and cheap relative to a whole failed run.
+message("[seismic] calc_specificity ...")
+t_spec <- Sys.time()
+spec_obj <- calc_specificity(sce, ct_label_col = ct_col)
+message(sprintf("[seismic] specificity done in %s",
+                format(round(Sys.time() - t_spec, 1))))
 
 # ---- 3. Regression --------------------------------------------------------
 
@@ -160,16 +163,16 @@ run_regression <- function(spec, mz) {
 }
 
 res <- run_regression(spec_obj, magma_z)
+
+# seismicGWAS 1.0.0 returns only cell_type, pvalue, FDR.
 n_cells_per_ct <- as.integer(table(colData(sce)[[ct_col]]))
 names(n_cells_per_ct) <- names(table(colData(sce)[[ct_col]]))
 
 headline <- data.frame(
-  cell_type   = res$cell_type,
-  coefficient = res$coefficient,
-  se          = res$se,
-  pvalue      = res$pvalue,
-  n_genes     = res$n_genes,
-  n_cells     = n_cells_per_ct[as.character(res$cell_type)],
+  cell_type = as.character(res$cell_type),
+  pvalue    = as.numeric(res$pvalue),
+  FDR       = as.numeric(res$FDR),
+  n_cells   = n_cells_per_ct[as.character(res$cell_type)],
   stringsAsFactors = FALSE
 )
 headline_path <- file.path(
@@ -181,24 +184,28 @@ write.table(headline, headline_path, sep = "\t",
 message(sprintf("[seismic] wrote %s (n_cell_types=%d)",
                 headline_path, nrow(headline)))
 
-# ---- 4. M permutations of MAGMA gene-Z ------------------------------------
+# ---- 4. Optional: M permutations of MAGMA gene-Z --------------------------
 
-if (!opt[["skip-permutations"]]) {
+# seismic 1.0.0 has no coefficient in its output, so the null we track
+# per permutation is -log10(pvalue) (mirrors the score column the
+# laptop driver synthesizes for cross-method comparison).
+if (isTRUE(opt[["run-permutations"]])) {
   set.seed(opt$seed)
-  message(sprintf("[seismic] running %d permutations", opt$permutations))
-  perm_rows <- vector("list", opt$permutations)
-  for (i in seq_len(opt$permutations)) {
+  M <- opt$permutations
+  message(sprintf("[seismic] running %d permutations", M))
+  perm_rows <- vector("list", M)
+  for (i in seq_len(M)) {
     mz_perm <- magma_z
     mz_perm$z <- sample(magma_z$z)
     r <- run_regression(spec_obj, mz_perm)
     perm_rows[[i]] <- data.frame(
       permutation_idx = i,
-      cell_type       = r$cell_type,
-      coefficient     = r$coefficient,
+      cell_type       = as.character(r$cell_type),
+      neg_log10_p     = -log10(as.numeric(r$pvalue)),
       stringsAsFactors = FALSE
     )
     if (i %% 100 == 0) {
-      message(sprintf("[seismic]   ... permutation %d/%d", i, opt$permutations))
+      message(sprintf("[seismic]   ... permutation %d/%d", i, M))
     }
   }
   perm_long <- do.call(rbind, perm_rows)
@@ -210,18 +217,23 @@ if (!opt[["skip-permutations"]]) {
   message(sprintf("[seismic] wrote %s (%d rows)", perm_path, nrow(perm_long)))
 }
 
-# ---- 5. Test-retest gate --------------------------------------------------
+# ---- 5. Optional: test-retest gate ---------------------------------------
 
-res_rerun <- run_regression(spec_obj, magma_z)
-ord <- order(res$cell_type)
-ord2 <- order(res_rerun$cell_type)
-rho <- cor(res$coefficient[ord], res_rerun$coefficient[ord2],
-           method = "spearman")
-if (is.na(rho) || rho < 0.999) {
-  message(sprintf("[seismic] FAIL: test-retest spearman=%.6f < 0.999", rho))
-  quit(status = 1)
+if (isTRUE(opt[["run-retest"]])) {
+  res_rerun <- run_regression(spec_obj, magma_z)
+  ord  <- order(res$cell_type)
+  ord2 <- order(res_rerun$cell_type)
+  # 1.0.0 exposes pvalue/FDR only — use -log10(pvalue) as the
+  # reproducibility signal (the coefficient-based gate isn't available).
+  score1 <- -log10(as.numeric(res$pvalue))[ord]
+  score2 <- -log10(as.numeric(res_rerun$pvalue))[ord2]
+  rho <- suppressWarnings(cor(score1, score2, method = "spearman"))
+  if (is.na(rho) || rho < 0.999) {
+    message(sprintf("[seismic] FAIL: test-retest spearman(-log10 p)=%.6f < 0.999", rho))
+    quit(status = 1)
+  }
+  message(sprintf("[seismic] test-retest PASS: spearman(-log10 p)=%.6f", rho))
 }
-message(sprintf("[seismic] test-retest PASS: spearman=%.6f", rho))
 
 elapsed <- format(round(Sys.time() - t0, 1))
 message(sprintf("[seismic] DONE in %s", elapsed))
