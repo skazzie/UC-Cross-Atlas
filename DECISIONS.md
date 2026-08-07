@@ -3394,3 +3394,25 @@ DIVERGENCE FROM GARRIDO: T cell NOT strongly negative on Smillie (mid-pack ~+0.4
 STATUS: MHC-exclusion inversion now confirmed on 2 atlases (Garrido, Smillie) x
   2 GWAS (de Lange, Liu) x cov-robust. Solid for M-level MHC-policy escalation.
 CAVEAT: depth+donor(+sample) corrected, sex unavailable in SCP259 metadata.
+
+## SESSION 2026-08-06: seismicGWAS unblocked + run on Garrido + Smillie
+seismic was blocked since June (readH5AD -> basilisk -> tries to compile Python
+3.14 from source, fails on sudo-less VM). SOLVED via flat-export bypass:
+  h5ad_to_sce_export.py (anndata reads h5ad, writes raw counts.mtx + logcounts.mtx
+  [log1p CP10k from X] + genes/barcodes/obs) -> sce_from_export.R (pure-R SCE
+  build, no zellkonverter) -> run_seismic.R --sce-rds (readRDS, no basilisk).
+seismic 1.0.0 API fixes to run_seismic.R (driver was written against older API):
+  - get_ct_trait_associations takes NO confounders arg (internal correction);
+    removed CONFOUNDERS. Passes magma_gene_col="SYMBOL", magma_z_col="ZSTAT".
+  - returns only cell_type, pvalue, FDR (no coefficient/se/n_genes).
+  - removed feather cache (round-trip lost gene rownames -> 1-gene-overlap fail).
+  - permutation/retest behind --run-permutations / --run-retest (default FALSE).
+RESULTS: 8 seismic TSVs written (Garrido + Smillie) x (delange, liu) x (broad, fine).
+CROSS-METHOD CONCORDANCE (first look, MHC-excluded, broad, de Lange):
+  Both methods rank EPITHELIAL top. Garrido seismic: goblet/epi-progenitor/DC;
+  Smillie seismic: colonocyte/goblet/epi-progenitor -- matches scDRS-excluded
+  (colonocyte + epi progenitor) on both atlases. NOTE: rank concordance only;
+  nothing FDR-significant (top FDR 0.41 Garrido, 0.63 Smillie). Quantify via
+  06_concordance/08_cross_method Spearman across full rankings (inputs now exist).
+STATUS: Garrido + Smillie COMPLETE on both methods. seismic chain proven, ~20s-4min
+  per run. Remaining: TAURUS, HCA, Pan-GI (Pan-GI needs 128GB VM + backed loader).
