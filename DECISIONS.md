@@ -3416,3 +3416,14 @@ CROSS-METHOD CONCORDANCE (first look, MHC-excluded, broad, de Lange):
   06_concordance/08_cross_method Spearman across full rankings (inputs now exist).
 STATUS: Garrido + Smillie COMPLETE on both methods. seismic chain proven, ~20s-4min
   per run. Remaining: TAURUS, HCA, Pan-GI (Pan-GI needs 128GB VM + backed loader).
+
+## SESSION 2026-08-06 (cont.): First quantified cross-method concordance (scDRS vs seismic)
+run_scdrs_seismic_concordance.py: Spearman(scDRS assoc_mcz, seismic -log10 pvalue),
+MHC-excluded pairing, broad tier. Results:
+  Garrido x de Lange: rho=0.53, p=0.044, n=15
+  Garrido x Liu:      rho=0.70, p=0.004, n=15
+  Smillie x de Lange: rho=0.67, p=0.008, n=14
+All positive + nominally significant -> methods substantially agree on cell-type
+enrichment ranking. CAVEAT: seismic 1.0.0 unsigned (-log10 p) vs scDRS signed mcz;
+this is enrichment-rank concordance, not effect-size. PARTIAL: broad only (scDRS
+fine-tier group tables not yet generated on VM); Smillie x Liu scDRS not yet run.
