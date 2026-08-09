@@ -256,17 +256,6 @@ MAJOR_TO_BROAD: dict[str, str] = {
     # B / plasma lineage
     "B":                                 "B cell",
     "Plasma":                            "plasma cell",
-    # C3+_ZBTB-blast label was pasted as "C3pos_zbtb...blast" (user
-    # abbreviated); listing plausible full spellings so first-run has
-    # a good chance of hitting the exact obs value. All map to plasma
-    # cell (ZBTB32+ C3+ blasts are pre-plasmablast lineage in gut).
-    # If gate (2) fires again, replace with the exact string it prints.
-    "C3pos_ZBTB32pos_preplasmablast":    "plasma cell",
-    "C3pos_zbtb32pos_preplasmablast":    "plasma cell",
-    "C3pos_ZBTB32pos_plasmablast":       "plasma cell",
-    "C3pos_zbtb32pos_plasmablast":       "plasma cell",
-    "C3pos_ZBTB32pos_Bblast":            "plasma cell",
-    "C3pos_zbtb32pos_Bblast":            "plasma cell",
     # T / NK / ILC — all conventional T collapse to "T cell";
     # innate lymphocytes go to the NK/ILC bucket.
     "CD4_T":                             "T cell",
@@ -287,6 +276,7 @@ MAJOR_TO_BROAD: dict[str, str] = {
     "LP_fibroblast":                     "fibroblast",
     "Myofibroblast":                     "fibroblast",
     "THY1pos_FAPpos_PDPNpos_fibroblast": "fibroblast",
+    "C3pos_fibroblast":                  "fibroblast",
     "Cycling_stroma":                    "fibroblast",
     "Pericyte":                          "mural/glia",
     "Glial":                             "mural/glia",
