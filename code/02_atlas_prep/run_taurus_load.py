@@ -10,23 +10,25 @@ DATA VERSION CAVEAT — disregard any TAURUS metadata dated before
 metadata that will fail the loader's Supp-Table-1B donor invariant.
 Use v3 (posted 2024-10-30 or later).
 
-Covariate structure: depth (log_n_genes, log_n_counts) + SAMPLE dummies
-only. NO donor column and NO disease/health covariate. Reason to drop
-donor: in TAURUS each sample_id nests within exactly one donor (donor
-UC1 → sample CID003356-1, ...), so donor + sample dummies + const are
-linearly dependent (~23 redundant columns → rank 54 of 77 →
-np.linalg.solve singular in scDRS's covariate regression). Sample-
-level dummies fully absorb donor-level variation, consistent with
-sample-level batch correction as used for Smillie. NO disease/health
-covariate per the "no-disease-covariate" rule (that would scrub the
-signal we test).
+Covariate structure — matches Smillie's smillie_covariates.tsv exactly:
+depth (log_n_genes, log_n_counts) + PRE-EXPANDED SAMPLE dummies as
+explicit ``sample_<id>`` float 0.0/1.0 columns. NO donor column
+(sample_id nests within donor → sample dummies absorb donor-level
+variation) and NO disease/health covariate (would scrub the signal we
+test — see the "no-disease-covariate" rule).
 
-Sample dummy prefers ``obs['sample_id']`` (true biopsy-level unit that
-nests within donor); if the loader didn't carry it through, we fall
-back to ``obs['region']`` (=Site: Ascending_Colon / Descending_Colon /
-Rectum / Sigmoid) but the nesting assertion below will fail loud in
-that case — Site crosses donors, so dropping donor while using Site as
-the sample dummy would under-correct.
+Why pre-expanded, not a raw categorical column: scDRS's category2dummy
+path expands categoricals into pandas bool dummies, then
+``df_cov.values`` upcasts to ``object`` dtype, and np.linalg.solve
+crashes with ``Cannot cast dtype('O') to float64``. Pre-expanding to
+explicit float dummies here hands scDRS a fully numeric matrix and
+bypasses category2dummy entirely.
+
+Sample column prefers ``obs['sample_id']`` (true biopsy-level unit that
+nests within donor). If the loader didn't carry it through we fall back
+to ``obs['region']`` (=Site) but the nesting gate below fails loud in
+that case — Site crosses donors, so dropping donor + using Site as the
+sample dummy would under-correct.
 
 Neighbors precomputed inline (min_genes=250 / min_cells=50 scDRS-replica
 filter, then ``sc.pp.pca(n_comps=20)`` + ``sc.pp.neighbors(n_neighbors=15,
@@ -163,18 +165,39 @@ def main():
         f"each sample → exactly one donor (sample_col='{sample_col_name}')."
     )
 
-    cov = pd.DataFrame({
-        "const": 1,
+    # Pre-expand sample into explicit float 0.0/1.0 dummy columns
+    # (sample_<id>). Matches smillie_covariates.tsv structure and avoids
+    # scDRS's category2dummy bool-dummy path that upcasts to object.
+    sample_dummies = pd.get_dummies(
+        pd.Series(sample_values, index=adata.obs_names, name="sample"),
+        prefix="sample",
+    ).astype(float)
+
+    depth = pd.DataFrame({
+        "const":        1.0,
         "log_n_genes":  np.log1p(n_genes),
         "log_n_counts": np.log1p(n_counts),
-        "sample": sample_values,
     }, index=adata.obs_names)
+    cov = pd.concat([depth, sample_dummies], axis=1)
     cov.index.name = "cell"
+
+    # Belt-and-suspenders: every column must be a float64 so scDRS's
+    # np.asarray(df_cov.values, dtype=float) doesn't hit dtype('O').
+    non_numeric = [c for c in cov.columns
+                   if not pd.api.types.is_numeric_dtype(cov[c])]
+    if non_numeric:
+        raise SystemExit(
+            f"[driver] cov has non-numeric columns after pre-expansion: "
+            f"{non_numeric}. scDRS will crash on df_cov.values upcast."
+        )
+
     cov.to_csv(a.out_cov, sep="\t")
-    print(f"[driver] wrote {a.out_cov}: {list(cov.columns)} "
-          f"(sample <- obs['{sample_col_name}']; donor DROPPED — absorbed "
-          f"by sample dummies; no disease/health per no-disease-covariate "
-          f"rule)")
+    print(
+        f"[driver] wrote {a.out_cov}: {len(cov.columns)} numeric cols "
+        f"(const + 2 depth + {sample_dummies.shape[1]} sample_<id> "
+        f"float dummies) — donor DROPPED (absorbed by sample dummies); "
+        f"no disease/health per no-disease-covariate rule."
+    )
 
 
 if __name__ == "__main__":
