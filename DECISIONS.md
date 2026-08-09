@@ -3427,3 +3427,13 @@ All positive + nominally significant -> methods substantially agree on cell-type
 enrichment ranking. CAVEAT: seismic 1.0.0 unsigned (-log10 p) vs scDRS signed mcz;
 this is enrichment-rank concordance, not effect-size. PARTIAL: broad only (scDRS
 fine-tier group tables not yet generated on VM); Smillie x Liu scDRS not yet run.
+
+## SESSION 2026-08-09: Concordance complete on both loaded atlases (broad+fine)
+scdrs_vs_seismic now 6 rows, all positive + significant:
+  Garrido dL broad 0.53 (p.044) / fine 0.48 (p1.3e-5)
+  Garrido Liu broad 0.70 (p.004) / fine 0.37 (p.001)
+  Smillie dL broad 0.67 (p.008) / fine 0.40 (p.003)
+Cross-method concordance holds on BOTH atlases at BOTH resolutions. Pattern:
+broad rho higher (fewer types), fine rho lower but p far smaller (51-75 types) ->
+fine is the more robust evidence. Only gap on loaded atlases: Smillie x Liu scDRS
+(not yet run). Garrido + Smillie now COMPLETE on both methods x de Lange (+ Garrido Liu).
