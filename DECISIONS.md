@@ -3437,3 +3437,19 @@ Cross-method concordance holds on BOTH atlases at BOTH resolutions. Pattern:
 broad rho higher (fewer types), fine rho lower but p far smaller (51-75 types) ->
 fine is the more robust evidence. Only gap on loaded atlases: Smillie x Liu scDRS
 (not yet run). Garrido + Smillie now COMPLETE on both methods x de Lange (+ Garrido Liu).
+
+## SESSION 2026-08-09 (cont.): TAURUS loaded (atlas #3) + scDRS covariate root-cause
+TAURUS (Zenodo v3 14007626, TAURUS_raw_counts_annotated_final.h5ad, 12.7GB) loaded on
+128GB VM: 230,130 cells (UC x colonic x baseline), 22 UC donors, 17698 genes, neighbors
+baked, no-disease-cov. Broad cell types mapped 21 major labels -> 11 shared broad
+categories (missing goblet/enteroendocrine/epi-progenitor/granulocyte at broad tier;
+fine-tier covers).
+COVARIATE ROOT-CAUSE (cost 5 iterations): scDRS compute-score crashed with
+"Cannot cast dtype('O') to float64" in reg_out. Cause: handing scDRS a CATEGORICAL
+cov column -> its category2dummy makes BOOL dummies -> df_cov.values upcasts to object
+-> np.linalg.solve rejects. FIX: cov must PRE-EXPAND to float 0/1 dummy columns
+(match smillie_covariates.tsv), never a raw categorical. Also dropped donor (samples
+nest in donors -> collinear). Applies to ALL remaining atlas loaders (HCA, Pan-GI).
+STATUS: TAURUS scDRS 2x2 running (128GB). Pan-GI needs run_pangi_load.py driver
+(CC writing, with all TAURUS lessons). VM on e2-highmem-16 (128GB) — resize back to
+64GB after heavy loads to save cost.
