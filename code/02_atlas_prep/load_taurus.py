@@ -228,16 +228,68 @@ _MINOR_COL_CANDIDATES = (
 from _broad_vocab import _BROAD_VOCAB
 from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE  # QC_STATE_TO_PARENT keys on cell_type_low which TAURUS lacks
 
-# Map from TAURUS `major`-tier labels into the canonical broad vocab.
-# Ships EMPTY in this v0 — the 8 major labels [Plasma, Endothelium,
-# CD4_T, CD8_T, Non_ileal_epithelium, Pericyte, B, Mono_macro] surfaced
-# from schema inspection 2026-08-09, but their canonical-broad targets
-# require a biology pass. Gate (2) at end-of-load will fail loud on
-# first run with every unmapped label listed; populate below (one commit
-# per Muskaan biology pass) until the gate passes.
+# Map from TAURUS `major`-tier labels into the canonical broad vocab
+# (single-sourced from _broad_vocab._BROAD_VOCAB — same 15 terms as
+# Garrido + Smillie so 06_concordance's string-intersection on
+# cell_type_broad aligns across atlases).
+#
+# 21 major labels enumerated by gate (2) first-run 2026-08-09.
+#
+# Scope notes:
+# - TAURUS has NO "goblet" / "enteroendocrine/tuft" / "epithelial
+#   progenitor" bucket at the major tier — those subsets live inside
+#   `Non_ileal_epithelium` and only surface at the minor tier. The
+#   broad-tier map collapses Non_ileal_epithelium → "colonocyte" per
+#   user directive; concordance for goblet/EE/progenitor at broad tier
+#   is therefore NOT estimable from TAURUS (fine tier still works).
+# - TAURUS has NO "granulocyte" bucket (droplet lysis — structural
+#   zero, matches Smillie).
+# - All T-lineage majors collapse to "T cell"; `Innate_lymphocytes`
+#   goes to "NK/ILC" (the innate-lymphoid bucket, not T cell).
+# - All fibroblast/stromal-flavoured majors collapse to "fibroblast";
+#   `Pericyte` and `Glial` go to "mural/glia" (the joint mural+glia
+#   bucket used by Garrido / Smillie).
+# - `Cycling_MNP` goes to "monocyte/macrophage" (MNP is dominantly the
+#   macro/mono branch in gut mucosa; cycling DCs would be a small
+#   share and don't warrant a separate branch here).
 MAJOR_TO_BROAD: dict[str, str] = {
-    # TODO(taurus-first-run): populate for the 8 major-tier labels.
-    # Until then, gate (2) raises with the actual labels listed.
+    # B / plasma lineage
+    "B":                                 "B cell",
+    "Plasma":                            "plasma cell",
+    # C3+_ZBTB-blast label was pasted as "C3pos_zbtb...blast" (user
+    # abbreviated); listing plausible full spellings so first-run has
+    # a good chance of hitting the exact obs value. All map to plasma
+    # cell (ZBTB32+ C3+ blasts are pre-plasmablast lineage in gut).
+    # If gate (2) fires again, replace with the exact string it prints.
+    "C3pos_ZBTB32pos_preplasmablast":    "plasma cell",
+    "C3pos_zbtb32pos_preplasmablast":    "plasma cell",
+    "C3pos_ZBTB32pos_plasmablast":       "plasma cell",
+    "C3pos_zbtb32pos_plasmablast":       "plasma cell",
+    "C3pos_ZBTB32pos_Bblast":            "plasma cell",
+    "C3pos_zbtb32pos_Bblast":            "plasma cell",
+    # T / NK / ILC — all conventional T collapse to "T cell";
+    # innate lymphocytes go to the NK/ILC bucket.
+    "CD4_T":                             "T cell",
+    "CD8_T":                             "T cell",
+    "Unconventional_T":                  "T cell",
+    "Innate_lymphocytes":                "NK/ILC",
+    # Myeloid
+    "Mono_macro":                        "monocyte/macrophage",
+    "Cycling_MNP":                       "monocyte/macrophage",
+    "DC":                                "dendritic cell",
+    "Mast":                              "mast cell",
+    # Epithelial (see scope note re. Non_ileal_epithelium collapse)
+    "Non_ileal_epithelium":              "colonocyte",
+    # Vasculature + stroma
+    "Endothelium":                       "endothelium",
+    "Fibroblast":                        "fibroblast",
+    "Epi_fibroblast":                    "fibroblast",
+    "LP_fibroblast":                     "fibroblast",
+    "Myofibroblast":                     "fibroblast",
+    "THY1pos_FAPpos_PDPNpos_fibroblast": "fibroblast",
+    "Cycling_stroma":                    "fibroblast",
+    "Pericyte":                          "mural/glia",
+    "Glial":                             "mural/glia",
 }
 
 # Gate (1): every value the map ships must be in the canonical vocab.

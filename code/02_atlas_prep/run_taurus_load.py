@@ -51,8 +51,14 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--h5ad", required=True,
                    help="TAURUS pooled h5ad (TAURUS_raw_counts_annotated_final.h5ad)")
-    p.add_argument("--out-h5ad", required=True)
-    p.add_argument("--out-cov", required=True)
+    # VM layout: outputs live under scratch/data/atlases/ (not
+    # ../../data/atlases/ — that's the code-tree repo path, no
+    # room for a 12 GB TAURUS write). Defaults resolve relative to
+    # `code/02_atlas_prep/`, which is where run_*.py is invoked from.
+    p.add_argument("--out-h5ad",
+                   default="../../scratch/data/atlases/taurus_uc_colonic_baseline.h5ad")
+    p.add_argument("--out-cov",
+                   default="../../scratch/data/atlases/taurus_uc_colonic_baseline.cov.tsv")
     a = p.parse_args()
 
     adata = load(a.h5ad)  # apply_v1_filter=True default; runs 22-donor gate
