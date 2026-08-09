@@ -10,15 +10,23 @@ DATA VERSION CAVEAT — disregard any TAURUS metadata dated before
 metadata that will fail the loader's Supp-Table-1B donor invariant.
 Use v3 (posted 2024-10-30 or later).
 
-Covariate structure mirrors Smillie: depth (log_n_genes, log_n_counts) +
-donor + sample dummies, with NO disease/health covariate (that would
-scrub the very signal we test — see the "no-disease-covariate" rule).
-TAURUS's loader sets ``obs['batch'] = obs['donor']`` (per-donor batches)
-so ``batch`` is not a distinct biopsy-level column. Sample dummy
-prefers ``obs['sample_id']`` when the loader carried it through
-(true biopsy-level unit); otherwise falls back to ``obs['region']``
-(=Site: Ascending_Colon / Descending_Colon / Rectum / Sigmoid), which
-is site-level rather than biopsy-level and coarser than sample_id.
+Covariate structure: depth (log_n_genes, log_n_counts) + SAMPLE dummies
+only. NO donor column and NO disease/health covariate. Reason to drop
+donor: in TAURUS each sample_id nests within exactly one donor (donor
+UC1 → sample CID003356-1, ...), so donor + sample dummies + const are
+linearly dependent (~23 redundant columns → rank 54 of 77 →
+np.linalg.solve singular in scDRS's covariate regression). Sample-
+level dummies fully absorb donor-level variation, consistent with
+sample-level batch correction as used for Smillie. NO disease/health
+covariate per the "no-disease-covariate" rule (that would scrub the
+signal we test).
+
+Sample dummy prefers ``obs['sample_id']`` (true biopsy-level unit that
+nests within donor); if the loader didn't carry it through, we fall
+back to ``obs['region']`` (=Site: Ascending_Colon / Descending_Colon /
+Rectum / Sigmoid) but the nesting assertion below will fail loud in
+that case — Site crosses donors, so dropping donor while using Site as
+the sample dummy would under-correct.
 
 Neighbors precomputed inline (min_genes=250 / min_cells=50 scDRS-replica
 filter, then ``sc.pp.pca(n_comps=20)`` + ``sc.pp.neighbors(n_neighbors=15,
@@ -113,10 +121,12 @@ def main():
         f"obsp['connectivities'] populated (n_pcs=20, n_neighbors=15)."
     )
 
-    # Depth + donor + sample dummies (no disease/health — that would
-    # scrub the signal we test). Loader sets batch = donor, so batch
-    # itself would just duplicate the donor dummy — sample column below
-    # is the biopsy-level nesting.
+    # Depth + SAMPLE dummies only (no donor, no disease/health). See
+    # module docstring — donor is dropped because sample nests in donor,
+    # so donor dummies are a linear combination of sample dummies and
+    # the joint design is singular (scDRS's covariate regression uses
+    # np.linalg.solve, which crashes on the resulting rank-deficient
+    # normal-equations matrix).
     X = adata.layers["counts"]
     n_counts = np.asarray(X.sum(axis=1)).ravel()
     n_genes  = np.asarray((X > 0).sum(axis=1)).ravel()
@@ -126,18 +136,45 @@ def main():
     else:
         sample_col_name = "region"  # =Site; site-level, not biopsy-level
         sample_values = adata.obs["region"].astype(str).values
+
+    # Nesting gate: each sample maps to exactly one donor. This must
+    # hold for the "drop donor, keep sample" strategy to be valid —
+    # otherwise sample dummies leave donor variation uncorrected and
+    # the covariate matrix under-corrects rather than over-parametrises.
+    nest_df = pd.DataFrame({
+        "sample": sample_values,
+        "donor":  adata.obs["donor"].astype(str).values,
+    })
+    donors_per_sample = nest_df.groupby("sample")["donor"].nunique()
+    multi_donor_samples = donors_per_sample[donors_per_sample > 1]
+    if len(multi_donor_samples) > 0:
+        raise SystemExit(
+            f"[driver] Sample-in-donor nesting violated: "
+            f"{len(multi_donor_samples)} sample(s) span multiple donors — "
+            f"cannot safely drop donor from cov. sample_col='{sample_col_name}'. "
+            f"First 10 offenders (sample -> n_donors): "
+            f"{multi_donor_samples.head(10).to_dict()}. "
+            f"Fix: use a truly biopsy-level column for sample, or revert "
+            f"to keeping donor and use a rank-tolerant regression."
+        )
+    print(
+        f"[driver] Sample nesting check passed: {donors_per_sample.size} "
+        f"unique samples across {nest_df['donor'].nunique()} donors, "
+        f"each sample → exactly one donor (sample_col='{sample_col_name}')."
+    )
+
     cov = pd.DataFrame({
         "const": 1,
         "log_n_genes":  np.log1p(n_genes),
         "log_n_counts": np.log1p(n_counts),
-        "donor":  adata.obs["donor"].astype(str).values,
         "sample": sample_values,
     }, index=adata.obs_names)
     cov.index.name = "cell"
     cov.to_csv(a.out_cov, sep="\t")
     print(f"[driver] wrote {a.out_cov}: {list(cov.columns)} "
-          f"(sample <- obs['{sample_col_name}']; no disease/health per "
-          f"no-disease-covariate rule)")
+          f"(sample <- obs['{sample_col_name}']; donor DROPPED — absorbed "
+          f"by sample dummies; no disease/health per no-disease-covariate "
+          f"rule)")
 
 
 if __name__ == "__main__":
