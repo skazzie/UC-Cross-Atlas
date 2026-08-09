@@ -1,3 +1,20 @@
+# ⭐ CANONICAL ATLAS ROSTER (authoritative — read this first)
+_Last confirmed: 2026-08-09, against code/_shared/constants.py:23_
+
+**5 atlases total:**
+- **3 core UC atlases** (`UC_ATLASES` in constants.py): **smillie, garrido_trigo, taurus**
+- **2 broad comparators** (separate loaders, tracked outside UC_ATLASES): **HCA Gut** (`load_hca_gut.py`, `code/10_broad_atlas_hca/`), **Pan-GI** (`load_pangi.py`, `code/11_broad_atlas_pangi/`)
+
+**Settled facts (do not re-litigate):**
+- **Mennillo is DROPPED** (2026-07-01, DECISION 16). Cause: entire UC cohort on-treatment (anti-TNF/5-ASA/vedolizumab), ZERO treatment-naive donors → pre-treatment subset is empty → treatment confound. `load_mennillo.py` deleted. Any DECISIONS/README/code line referencing Mennillo as an ACTIVE atlas is STALE and predates this.
+- **TAURUS-IBD replaced Mennillo** as the 3rd core UC atlas (Buckley/Thomas/Dendrou, Nat Immunol 2024; 22 UC donors, biologic-naïve baseline, whole mucosa). This is the "back to 5" restoration.
+- **HCA Gut is a SEPARATE atlas load**, not folded into Pan-GI. Its data overlaps Pan-GI's (Elmentaite2021 = ~398k cells nested in Pan-GI) — this is a documented scientific caveat (HCA framed as broad comparator with overlap noted + Pan-GI no-Elmentaite sensitivity), NOT an operational merge. HCA still loads/runs independently via load_hca_gut.py.
+- **No Kong.** Kong 2023 (Immunity, Crohn's) was corrected to Garrido-Trigo (GSE214695 UC subset) — DECISION (2/7). Kong-as-UC-atlas references are stale.
+
+**Status (2026-08-09):** Smillie ✓ both methods · Garrido ✓ both methods · TAURUS loaded, scDRS running · Pan-GI downloaded, loading today · HCA Gut not yet loaded.
+
+---
+
 # DECISIONS.md
 
 Append-only log of analytical commitments. Never edit existing entries —
