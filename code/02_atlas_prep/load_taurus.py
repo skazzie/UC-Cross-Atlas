@@ -14,19 +14,24 @@ baseline**, expected to yield 22 UC donors and ~50 inflamed baseline
 samples per the paper's Fig. 2b. CD and HC arms are dropped at the
 filter step.
 
-**Annotation hierarchy** (Methods, Extended Data Fig. 1b): 4 levels —
-``compartment`` → ``low`` → ``intermediate`` → ``cell_state``. The
-``cell_state`` tier is the 109-class finest output (used as
-``obs['cell_type_fine']``). The ``low`` tier is the source for
-``obs['cell_type_broad']`` via ``LOW_TO_BROAD`` mapping into the
-canonical 15-term vocab. All four hierarchy levels are preserved in obs
-for downstream use.
+**Annotation hierarchy** (verified against actual h5ad obs, 2026-08-09):
+TAURUS ships only TWO cell-type tiers — ``major`` (broad; 8 classes
+[Plasma, Endothelium, CD4_T, CD8_T, Non_ileal_epithelium, Pericyte, B,
+Mono_macro]) and ``minor`` (fine; ~109 classes). There is NO
+``compartment`` / ``low`` / ``intermediate`` sub-hierarchy like the
+Garrido or Smillie atlases. ``minor`` is stored as
+``obs['cell_type_fine']``; ``major`` is mapped to the canonical
+broad vocab via ``MAJOR_TO_BROAD`` and stored as
+``obs['cell_type_broad']``. The compartment / low / intermediate obs
+columns are intentionally omitted for TAURUS.
 
 **Filter chain (v1)** — three stages, NOT four:
 
 1. Disease == UC (drop CD + HC).
-2. Region in colonic set (drop terminal ileum; keep ascending /
-   descending / sigmoid / rectum and any other non-ileal label).
+2. Region: ``Ileum_vs_Colon`` in {Colon, Rectum} (drop Ileum). The
+   finer ``Site`` column (Ascending_Colon / Descending_Colon / Sigmoid /
+   Rectum / Terminal_Ileum) is preserved for cohort validation and
+   biopsy-level covariate structure.
 3. Timepoint == baseline / W0 / pretreatment (drop post-treatment).
 
 The Zenodo deposit description suggests ``inflammation_score > 6.5``
@@ -43,28 +48,25 @@ loaders. See DECISIONS correction (18)(a).
 
 **Validation gates** (mirror correction 9 / 12 / 16 patterns):
 
-- Donor-structure hard invariant: 22 UC donors after the full filter.
+- Donor-structure hard invariant: 22 UC donors (``Patient`` column)
+  after the full filter. Per-donor ``Site`` sets checked against Supp
+  Table 1B (EXPECTED_UC_COHORT).
 - Cell-count tripwire (soft): expect ~30-50k cells but TBD on first run;
   log only.
 - Canonical-vocab assertions (gates 1 + 2): same two-gate pattern as
-  the Garrido + Smillie loaders. ``LOW_TO_BROAD`` ships **empty** in
-  this v0 because the ``low``-tier label set is not in the paper's
-  Methods text — gate 2 will fail loud on first run with the actual
-  labels listed, and the map then gets filled in (one commit per
-  Muskaan biology pass).
+  the Garrido + Smillie loaders. ``MAJOR_TO_BROAD`` ships **empty** in
+  this v0 — gate 2 will fail loud on first run listing the 8 major
+  labels [Plasma, Endothelium, CD4_T, CD8_T, Non_ileal_epithelium,
+  Pericyte, B, Mono_macro] so their canonical-broad targets can be
+  populated (one commit per Muskaan biology pass).
 - Counts pipeline: ``log1p(CP10k)`` on load per DECISIONS (5/7); raw
   integer counts preserved in ``layers['counts']``;
   ``raw_count_mode=True`` unsupported.
 
 **Open before first run** (DECISIONS 16 + load gate will catch):
 
-- The exact obs column names — Methods doesn't name them. This loader
-  uses defensive auto-detect against candidate name lists; KeyError
-  raises if no candidate matches, with the actual obs.columns dumped
-  for triage.
-- The ``low``-tier label set → ``LOW_TO_BROAD`` map.
-- Exact per-donor cell counts after subset (Supp Table 1 has these;
-  load-gate will validate when the values are populated below).
+- The ``major``-tier label set → ``MAJOR_TO_BROAD`` map (8 labels
+  from schema inspection 2026-08-09; canonical-broad targets TBD).
 
 References: DECISIONS.md (16) [Mennillo→TAURUS swap]; (5/7)
 [normalization]; (11) [HGNC pin]; (9) / (12) [loader discipline].
@@ -104,13 +106,12 @@ PAPER_BASELINE_INFLAMMATION_MIN: float = 6.5  # NOT applied; see (18)(a)
 # get canonicalized to short strings by _canonicalize_disease).
 KEEP_DISEASE = ("UC",)  # v1 strict — drop CD and HC per user spec
 
-# Region values that count as colonic. Match is substring-based after
-# whitespace/case normalization (so "ascending colon" matches; so does
-# "ascending_colon"). Terminal ileum and any other ileal region drop.
-COLONIC_REGION_KEYS: tuple[str, ...] = (
-    "ascending", "descending", "transverse", "sigmoid", "rectum", "colon",
-)
-ILEAL_REGION_KEYS: tuple[str, ...] = ("ileum", "ileal")
+# Region filter operates on the coarse `Ileum_vs_Colon` obs column,
+# whose value set is exactly {Rectum, Colon, Ileum}. Keep Colon+Rectum,
+# drop Ileum. The finer `Site` column (Ascending_Colon / Descending_Colon
+# / Sigmoid / Rectum / Terminal_Ileum) is preserved separately for
+# cohort validation and covariate structure — see load(): scol.
+COLONIC_REGION_VALUES: frozenset[str] = frozenset({"colon", "rectum"})
 
 # Timepoint values that count as baseline. Matched by EXACT equality
 # after lower-case + whitespace-normalize. **Includes the bare token
@@ -188,11 +189,15 @@ _DISEASE_COL_CANDIDATES = (
     "diagnosis", "Diagnosis", "disease",
     "condition", "Condition", "disease_status", "group",
 )
-_REGION_COL_CANDIDATES = (
-    "Site",  # TAURUS Supp Table 1B
-    "region", "Region", "tissue", "Tissue",
-    "anatomical_region", "site", "location", "Location",
-    "biopsy_site", "tissue_region",
+_REGION_FILTER_COL_CANDIDATES = (
+    "Ileum_vs_Colon",  # TAURUS: coarse [Rectum, Colon, Ileum] — used for filter
+    "ileum_vs_colon", "region_broad",
+)
+_SITE_COL_CANDIDATES = (
+    "Site",  # TAURUS Supp Table 1B — fine [Ascending_Colon, Descending_Colon,
+             # Rectum, Sigmoid, Terminal_Ileum]. Used for cohort + covariate.
+    "site", "biopsy_site", "region", "Region", "tissue", "Tissue",
+    "anatomical_region", "location", "Location", "tissue_region",
 )
 _TIMEPOINT_COL_CANDIDATES = (
     "Treatment",  # TAURUS Supp Table 1B ("Pre" / "Post")
@@ -206,43 +211,42 @@ _INFLAMMATION_COL_CANDIDATES = (
     "Inflammation", "inflammation_grade", "infl_score",
     "macroscopic_inflammation", "endoscopic_inflammation",
 )
-_HIERARCHY_LEVELS = ("compartment", "low", "intermediate", "cell_state")
-_HIERARCHY_CANDIDATES = {
-    "compartment": ("compartment", "Compartment", "lineage", "level_1",
-                    "cell_type_compartment"),
-    "low":         ("low", "Low", "cell_type_low", "level_2",
-                    "broad_celltype", "cell_class"),
-    "intermediate":("intermediate", "Intermediate", "cell_type_intermediate",
-                    "level_3", "cell_type", "Celltype"),
-    "cell_state":  ("cell_state", "Cell_State", "level_4", "state",
-                    "Annotation", "annotation", "cellstate"),
-}
+# TAURUS has only 2 cell-type tiers — `major` (broad; 8 classes) and
+# `minor` (fine; ~109 classes). No compartment / low / intermediate.
+_MAJOR_COL_CANDIDATES = (
+    "major", "Major", "cell_type_major", "broad", "cell_type_broad",
+)
+_MINOR_COL_CANDIDATES = (
+    "minor", "Minor", "cell_type_minor", "fine", "cell_type_fine",
+    "cell_state", "Cell_State", "annotation", "Annotation",
+)
 
 # ---- Canonical broad vocab (single-sourced; same 15 in every loader) ----
 # Single-sourced from sibling _broad_vocab module. Loader-local copies
 # were a drift risk that 06_concordance would have reported as biology.
 # Gate (1) at module load + gate (2) at end-of-load. See DECISIONS (20).
 from _broad_vocab import _BROAD_VOCAB
-from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE, QC_STATE_TO_PARENT
+from _qc_policy import EXCLUDE_LINEAGE_AMBIGUOUS_FINE  # QC_STATE_TO_PARENT keys on cell_type_low which TAURUS lacks
 
-# Map from TAURUS `low`-tier labels into the canonical broad vocab.
-# Ships EMPTY in this v0 — the `low`-tier label set is not in the paper
-# Methods text. Gate (2) at end-of-load will fail loud on first run with
-# every unmapped label listed; populate below (one commit per Muskaan
-# biology pass) until the gate passes. The Garrido and Smillie loaders
-# document analogous maps (FINE_TO_BROAD); they're the template.
-LOW_TO_BROAD: dict[str, str] = {
-    # TODO(taurus-first-run): populate from the actual `low`-tier label
-    # set after the first end-to-end load. Until then, gate (2) raises.
+# Map from TAURUS `major`-tier labels into the canonical broad vocab.
+# Ships EMPTY in this v0 — the 8 major labels [Plasma, Endothelium,
+# CD4_T, CD8_T, Non_ileal_epithelium, Pericyte, B, Mono_macro] surfaced
+# from schema inspection 2026-08-09, but their canonical-broad targets
+# require a biology pass. Gate (2) at end-of-load will fail loud on
+# first run with every unmapped label listed; populate below (one commit
+# per Muskaan biology pass) until the gate passes.
+MAJOR_TO_BROAD: dict[str, str] = {
+    # TODO(taurus-first-run): populate for the 8 major-tier labels.
+    # Until then, gate (2) raises with the actual labels listed.
 }
 
 # Gate (1): every value the map ships must be in the canonical vocab.
 # Vacuously true while the map is empty; protects the day we start
 # filling it in.
-_unmapped_broad = set(LOW_TO_BROAD.values()) - _BROAD_VOCAB
+_unmapped_broad = set(MAJOR_TO_BROAD.values()) - _BROAD_VOCAB
 if _unmapped_broad:
     raise ValueError(
-        f"load_taurus.LOW_TO_BROAD ships broad values outside "
+        f"load_taurus.MAJOR_TO_BROAD ships broad values outside "
         f"_BROAD_VOCAB: {sorted(_unmapped_broad)}. Typo on the value "
         f"side of the map; see canonical_broad_DRAFT.md."
     )
@@ -308,12 +312,14 @@ def _is_baseline(value: object) -> bool:
 
 
 def _is_colonic(value: object) -> bool:
-    t = _normalize_token(value)
-    if not t:
-        return False
-    if any(key in t for key in ILEAL_REGION_KEYS):
-        return False
-    return any(key in t for key in COLONIC_REGION_KEYS)
+    """True iff the normalized Ileum_vs_Colon value is Colon or Rectum.
+
+    TAURUS's Ileum_vs_Colon takes exactly {Colon, Rectum, Ileum};
+    match is EXACT after lower-case + whitespace-normalize (not
+    substring) so a schema drift surfaces as a filter drop, not a
+    silent mis-classification.
+    """
+    return _normalize_token(value) in COLONIC_REGION_VALUES
 
 
 # ------------------------------------------------------------------------
@@ -326,13 +332,12 @@ def load(
     raw_count_mode: bool = False,
     donor_col: str | None = None,
     disease_col: str | None = None,
-    region_col: str | None = None,
+    region_filter_col: str | None = None,
+    site_col: str | None = None,
     timepoint_col: str | None = None,
     inflammation_col: str | None = None,
-    fine_col: str | None = None,
-    low_col: str | None = None,
-    intermediate_col: str | None = None,
-    compartment_col: str | None = None,
+    major_col: str | None = None,
+    minor_col: str | None = None,
 ) -> AnnData:
     """Load TAURUS-IBD pooled h5ad and subset to v1 UC × colonic × baseline.
 
@@ -352,24 +357,29 @@ def load(
         ships raw counts in X (per the filename); this loader applies
         ``log1p(CP10k)`` and preserves the raw matrix in
         ``layers['counts']``.
-    donor_col, disease_col, region_col, timepoint_col, inflammation_col
+    donor_col, disease_col, region_filter_col, site_col, timepoint_col,
+    inflammation_col
         Optional explicit obs column names. Auto-detected when not
-        provided.
-    fine_col, low_col, intermediate_col, compartment_col
-        Optional explicit obs column names for the 4-level cell-type
-        hierarchy. Auto-detected when not provided.
+        provided. ``region_filter_col`` is the coarse column used for
+        the colonic filter (TAURUS: ``Ileum_vs_Colon``); ``site_col``
+        is the finer column stored as ``obs['region']`` and used for
+        cohort validation + covariate structure (TAURUS: ``Site``).
+    major_col, minor_col
+        Optional explicit obs column names for TAURUS's 2-tier cell-type
+        hierarchy (``major``→broad, ``minor``→fine). Auto-detected when
+        not provided.
 
     Returns
     -------
     AnnData
         cells × genes; ``X`` = log1p(CP10k) float; raw counts preserved
         in ``layers['counts']``; obs schema: ``cell_type_fine``,
-        ``cell_type_intermediate``, ``cell_type_low``,
-        ``cell_type_compartment``, ``cell_type_broad``, ``donor``,
-        ``donor_id``, ``disease``, ``region``, ``timepoint``,
-        ``inflammation_score``, ``batch``, ``tissue``. var schema
-        depends on the source h5ad's gene representation; the final
-        ``ensembl_to_hgnc`` step normalizes ``var_names`` to HGNC.
+        ``cell_type_broad``, ``donor``, ``donor_id``, ``disease``,
+        ``region`` (=Site), ``timepoint``, ``inflammation_score``,
+        ``batch``, ``tissue`` — and ``sample_id`` when the source h5ad
+        provides it. var schema depends on the source h5ad's gene
+        representation; the final ``ensembl_to_hgnc`` step normalizes
+        ``var_names`` to HGNC.
     """
     if raw_count_mode:
         raise ValueError(
@@ -401,21 +411,20 @@ def load(
     # ---- 2. Auto-detect schema columns ----
     dcol = donor_col or _autodetect_column(obs, _DONOR_COL_CANDIDATES, "donor")
     discol = disease_col or _autodetect_column(obs, _DISEASE_COL_CANDIDATES, "disease")
-    rcol = region_col or _autodetect_column(obs, _REGION_COL_CANDIDATES, "region")
+    rfcol = region_filter_col or _autodetect_column(
+        obs, _REGION_FILTER_COL_CANDIDATES, "region_filter"
+    )
+    scol = site_col or _autodetect_column(obs, _SITE_COL_CANDIDATES, "site")
     tcol = timepoint_col or _autodetect_column(obs, _TIMEPOINT_COL_CANDIDATES, "timepoint")
     icol = inflammation_col or _autodetect_column(
         obs, _INFLAMMATION_COL_CANDIDATES, "inflammation"
     )
-    hierarchy_cols = {
-        "compartment":  compartment_col  or _autodetect_column(obs, _HIERARCHY_CANDIDATES["compartment"],  "compartment"),
-        "low":          low_col          or _autodetect_column(obs, _HIERARCHY_CANDIDATES["low"],          "low"),
-        "intermediate": intermediate_col or _autodetect_column(obs, _HIERARCHY_CANDIDATES["intermediate"], "intermediate"),
-        "cell_state":   fine_col         or _autodetect_column(obs, _HIERARCHY_CANDIDATES["cell_state"],   "cell_state"),
-    }
+    majcol = major_col or _autodetect_column(obs, _MAJOR_COL_CANDIDATES, "major")
+    mincol = minor_col or _autodetect_column(obs, _MINOR_COL_CANDIDATES, "minor")
     logger.info(
-        "Auto-detected obs columns: donor=%r disease=%r region=%r "
-        "timepoint=%r inflammation=%r hierarchy=%s",
-        dcol, discol, rcol, tcol, icol, hierarchy_cols,
+        "Auto-detected obs columns: donor=%r disease=%r region_filter=%r "
+        "site=%r timepoint=%r inflammation=%r major=%r minor=%r",
+        dcol, discol, rfcol, scol, tcol, icol, majcol, mincol,
     )
 
     # Canonicalize disease for the disease-set assertion + filter.
@@ -439,7 +448,8 @@ def load(
         )
         # Materialize and skip directly to cell-type schema + normalize.
         return _finalize(
-            adata, obs, hierarchy_cols, dcol, discol, rcol, tcol, icol,
+            adata, obs, majcol, mincol,
+            dcol, discol, scol, tcol, icol,
             run_donor_assert=False,
         )
 
@@ -455,15 +465,16 @@ def load(
         list(KEEP_DISEASE), n_drop_disease, len(obs),
     )
 
-    # Stage B: colonic region (drop terminal ileum + any non-colonic).
-    keep_region = obs[rcol].map(_is_colonic).fillna(False).astype(bool)
+    # Stage B: colonic region via Ileum_vs_Colon in {Colon, Rectum}.
+    keep_region = obs[rfcol].map(_is_colonic).fillna(False).astype(bool)
     n_drop_region = int((~keep_region).sum())
     region_dropped_values = sorted(
-        set(obs.loc[~keep_region, rcol].dropna().astype(str).unique())
+        set(obs.loc[~keep_region, rfcol].dropna().astype(str).unique())
     )
     obs = obs[keep_region].copy()
     logger.info(
-        "Filter B (colonic region only): dropped %d (regions excluded: %s); kept %d",
+        "Filter B (%s in %s): dropped %d (values excluded: %s); kept %d",
+        rfcol, sorted(COLONIC_REGION_VALUES),
         n_drop_region, region_dropped_values, len(obs),
     )
 
@@ -536,9 +547,9 @@ def load(
         unexpected_in_obs = sorted(obs_donors - exp_donors)
         # Per-donor region diff (only for donors that exist on both sides)
         obs_by_donor_region = (
-            adata_sub.obs[[dcol, rcol]].astype(str)
+            adata_sub.obs[[dcol, scol]].astype(str)
             .drop_duplicates()
-            .groupby(dcol)[rcol]
+            .groupby(dcol)[scol]
             .agg(lambda s: frozenset(s.dropna()))
             .to_dict()
         )
@@ -602,7 +613,8 @@ def load(
         )
 
     return _finalize(
-        adata_sub, adata_sub.obs, hierarchy_cols, dcol, discol, rcol, tcol, icol,
+        adata_sub, adata_sub.obs, majcol, mincol,
+        dcol, discol, scol, tcol, icol,
         run_donor_assert=True,
     )
 
@@ -610,79 +622,74 @@ def load(
 def _finalize(
     adata: AnnData,
     obs: pd.DataFrame,
-    hierarchy_cols: dict[str, str],
-    dcol: str, discol: str, rcol: str, tcol: str, icol: str,
+    majcol: str, mincol: str,
+    dcol: str, discol: str, scol: str, tcol: str, icol: str,
     run_donor_assert: bool,
 ) -> AnnData:
     """Build standard obs schema, validate canonical vocab, normalize,
     HGNC-remap. Shared between the apply_v1_filter=True and =False paths.
+
+    TAURUS has only 2 cell-type tiers (major → broad, minor → fine); the
+    cell_type_compartment / _low / _intermediate obs columns are omitted.
     """
     # ---- 6. Build the standard obs schema. ----
     new_obs = pd.DataFrame(index=obs.index)
-    new_obs["cell_type_compartment"]  = obs[hierarchy_cols["compartment"]].astype(str).map(_normalize_label).astype("category")
-    new_obs["cell_type_low"]          = obs[hierarchy_cols["low"]].astype(str).map(_normalize_label).astype("category")
-    new_obs["cell_type_intermediate"] = obs[hierarchy_cols["intermediate"]].astype(str).map(_normalize_label).astype("category")
-    new_obs["cell_type_fine"]         = obs[hierarchy_cols["cell_state"]].astype(str).map(_normalize_label).astype("category")
+    new_obs["cell_type_fine"] = obs[mincol].astype(str).map(_normalize_label).astype("category")
     new_obs["donor_id"]   = obs[dcol].astype(str).astype("category")
     new_obs["donor"]      = new_obs["donor_id"]
     new_obs["disease"]    = obs.get("_disease_canon", obs[discol].map(_canonicalize_disease)).astype("category")
-    new_obs["region"]     = obs[rcol].astype(str).map(_normalize_label).astype("category")
+    new_obs["region"]     = obs[scol].astype(str).map(_normalize_label).astype("category")
     new_obs["timepoint"]  = obs[tcol].astype(str).map(_normalize_label).astype("category")
     new_obs["inflammation_score"] = pd.to_numeric(obs[icol], errors="coerce")
     new_obs["batch"]      = obs[dcol].astype(str).astype("category")  # per-donor batches
     new_obs["tissue"]     = "colonic mucosa"
+    # Carry through biopsy-level sample_id when the source h5ad provides
+    # it — run_taurus_load.py prefers it over region for the covariate
+    # file's sample dummy.
+    if "sample_id" in obs.columns:
+        new_obs["sample_id"] = obs["sample_id"].astype(str).astype("category")
 
-    # ---- 7. Map low -> canonical broad; assert vocab membership (gate 2). ----
-    low = new_obs["cell_type_low"].astype(str)
-    unmapped = sorted(set(low.unique()) - set(LOW_TO_BROAD))
+    # ---- 7. Map major -> canonical broad; assert vocab membership (gate 2). ----
+    major = obs[majcol].astype(str).map(_normalize_label)
+    unmapped = sorted(set(major.unique()) - set(MAJOR_TO_BROAD))
     if unmapped:
         raise KeyError(
-            f"TAURUS loader: {len(unmapped)} low-tier labels have no "
-            f"LOW_TO_BROAD entry. Extend the map "
-            f"(load_taurus.LOW_TO_BROAD). Unmapped labels (full list): "
+            f"TAURUS loader: {len(unmapped)} major-tier labels have no "
+            f"MAJOR_TO_BROAD entry. Extend the map "
+            f"(load_taurus.MAJOR_TO_BROAD). Unmapped labels (full list): "
             f"{unmapped}"
         )
-    broad = low.map(LOW_TO_BROAD)
+    broad = major.map(MAJOR_TO_BROAD)
     emitted = set(broad.dropna().unique())
     unrecognized = emitted - _BROAD_VOCAB
     if unrecognized:
         raise ValueError(
             f"TAURUS loader: emitted cell_type_broad values "
             f"{sorted(unrecognized)} are not in the canonical vocab. "
-            f"Fix LOW_TO_BROAD value side; see canonical_broad_DRAFT.md."
+            f"Fix MAJOR_TO_BROAD value side; see canonical_broad_DRAFT.md."
         )
     new_obs["cell_type_broad"] = broad.astype("category")
 
     n_fine  = int(new_obs["cell_type_fine"].nunique())
-    n_low   = int(new_obs["cell_type_low"].nunique())
-    n_int   = int(new_obs["cell_type_intermediate"].nunique())
-    n_comp  = int(new_obs["cell_type_compartment"].nunique())
     n_broad = int(new_obs["cell_type_broad"].nunique())
     logger.info(
-        "Tier cardinalities: compartment=%d, low=%d, intermediate=%d, "
-        "cell_state(fine)=%d, broad=%d",
-        n_comp, n_low, n_int, n_fine, n_broad,
+        "Tier cardinalities: major/broad=%d, minor/fine=%d",
+        n_broad, n_fine,
     )
-    if not (10 <= n_broad <= 15):
+    if not (5 <= n_broad <= 15):
         logger.warning(
-            "Broad-tier cardinality %d outside the v1 10-15 target; "
-            "review LOW_TO_BROAD grouping.", n_broad,
+            "Broad-tier cardinality %d outside the v1 5-15 target for "
+            "TAURUS (paper reports 8 major); review MAJOR_TO_BROAD grouping.",
+            n_broad,
         )
 
     adata.obs = new_obs
 
-    # ---- 7b. Cross-atlas QC policy (DECISIONS 22), applied AFTER the
-    # broad map for TAURUS because the EXCLUDE filter keys on cell_type_fine
-    # (109 cell states) and the QC collapse keys on cell_type_low — and
-    # both maps ship empty for TAURUS until the first-run label set
-    # surfaces. The hook is wired now so when Muskaan populates
-    # _qc_policy.{QC_STATE_TO_PARENT, EXCLUDE_LINEAGE_AMBIGUOUS_FINE} with
-    # TAURUS labels alongside LOW_TO_BROAD, the symmetry with Garrido /
-    # Smillie is structural, not by-copy. Applied here (not before the
-    # LOW_TO_BROAD lookup) only because LOW_TO_BROAD is currently empty
-    # and gate (2) above guards the broad column already; once
-    # LOW_TO_BROAD is populated this block moves up to live before the
-    # lookup (TODO taurus-first-run-followup).
+    # ---- 7b. Cross-atlas QC policy (DECISIONS 22).
+    # EXCLUDE_LINEAGE_AMBIGUOUS_FINE keys on cell_type_fine — applies as
+    # for Garrido/Smillie. QC_STATE_TO_PARENT keys on cell_type_low which
+    # TAURUS does not have; it is skipped here. Revisit if a
+    # minor-tier equivalent surfaces.
     fine_str = adata.obs["cell_type_fine"].astype(str)
     excl_mask = fine_str.isin(EXCLUDE_LINEAGE_AMBIGUOUS_FINE)
     n_excl = int(excl_mask.sum())
@@ -694,15 +701,6 @@ def _finalize(
             n_excl, len(excl_labels), excl_labels,
         )
         adata = adata[(~excl_mask).values].copy()
-    low_pre_qc = adata.obs["cell_type_low"].astype(str)
-    low_post_qc = low_pre_qc.replace(QC_STATE_TO_PARENT)
-    n_qc = int((low_pre_qc != low_post_qc).sum())
-    if n_qc:
-        logger.info(
-            "Collapsed %d QC-state cells into parent low-tier clusters "
-            "(DECISIONS 22).", n_qc,
-        )
-        adata.obs["cell_type_low"] = low_post_qc.astype("category")
 
     if run_donor_assert:
         per_donor = adata.obs["donor"].value_counts()

@@ -14,10 +14,11 @@ Covariate structure mirrors Smillie: depth (log_n_genes, log_n_counts) +
 donor + sample dummies, with NO disease/health covariate (that would
 scrub the very signal we test — see the "no-disease-covariate" rule).
 TAURUS's loader sets ``obs['batch'] = obs['donor']`` (per-donor batches)
-so ``batch`` is not a distinct biopsy-level column; we use
-``obs['region']`` (Ascending / Descending / Rectum / Sigmoid) as the
-biopsy-level dummy — donor × region is the TAURUS analog of Smillie's
-donor × sample nesting.
+so ``batch`` is not a distinct biopsy-level column. Sample dummy
+prefers ``obs['sample_id']`` when the loader carried it through
+(true biopsy-level unit); otherwise falls back to ``obs['region']``
+(=Site: Ascending_Colon / Descending_Colon / Rectum / Sigmoid), which
+is site-level rather than biopsy-level and coarser than sample_id.
 
 Neighbors precomputed inline (min_genes=250 / min_cells=50 scDRS-replica
 filter, then ``sc.pp.pca(n_comps=20)`` + ``sc.pp.neighbors(n_neighbors=15,
@@ -107,23 +108,30 @@ def main():
     )
 
     # Depth + donor + sample dummies (no disease/health — that would
-    # scrub the signal we test). Sample dummy = region (donor × region
-    # is the TAURUS biopsy analog; loader sets batch = donor, so batch
-    # itself would just duplicate the donor dummy).
+    # scrub the signal we test). Loader sets batch = donor, so batch
+    # itself would just duplicate the donor dummy — sample column below
+    # is the biopsy-level nesting.
     X = adata.layers["counts"]
     n_counts = np.asarray(X.sum(axis=1)).ravel()
     n_genes  = np.asarray((X > 0).sum(axis=1)).ravel()
+    if "sample_id" in adata.obs.columns:
+        sample_col_name = "sample_id"
+        sample_values = adata.obs["sample_id"].astype(str).values
+    else:
+        sample_col_name = "region"  # =Site; site-level, not biopsy-level
+        sample_values = adata.obs["region"].astype(str).values
     cov = pd.DataFrame({
         "const": 1,
         "log_n_genes":  np.log1p(n_genes),
         "log_n_counts": np.log1p(n_counts),
         "donor":  adata.obs["donor"].astype(str).values,
-        "sample": adata.obs["region"].astype(str).values,
+        "sample": sample_values,
     }, index=adata.obs_names)
     cov.index.name = "cell"
     cov.to_csv(a.out_cov, sep="\t")
     print(f"[driver] wrote {a.out_cov}: {list(cov.columns)} "
-          f"(no disease/health per no-disease-covariate rule)")
+          f"(sample <- obs['{sample_col_name}']; no disease/health per "
+          f"no-disease-covariate rule)")
 
 
 if __name__ == "__main__":
