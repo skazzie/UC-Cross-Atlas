@@ -76,12 +76,84 @@ _SAMPLE_COL_CANDIDATES = ("sample_id", "sample", "library_id", "library_uuid")
 # Garrido / Smillie / TAURUS so 06_concordance's string-intersection
 # on cell_type_broad aligns across atlases).
 #
-# Ships EMPTY in v0 — gate (2) at run-time raises on first run with
-# every unmapped level_2_annot label listed. Populate iteratively
-# (one commit per biology pass) until the gate passes.
+# 43 level_2_annot labels enumerated on the 128 GB VM 2026-08-09.
+#
+# Scope + collapse notes:
+# - No "mast cell" bucket at Pan-GI level_2 (would live at level_3
+#   under myeloid); mast cell broad tier is therefore not estimable
+#   from Pan-GI (fine tier still works if level_3 has it).
+# - All conventional T (Conventional_CD4 / CD8 / Treg) + cycling T/NK
+#   + Unconventional_T/ILC collapse to "T cell"; only pure NK goes to
+#   "NK/ILC". Rationale: mirrors TAURUS's split where innate lymphoid
+#   cells sit in NK/ILC and everything else T-lineage goes to T cell.
+# - Erythrocyte and Megakaryocyte/platelet have NO natural bucket in
+#   _BROAD_VOCAB (all 15 vocab terms are mucosal-resident lineages).
+#   Mapping to "granulocyte" as the closest blood-cell bucket; these
+#   are typically droplet-contamination in colonic biopsies and could
+#   alternatively be excluded via QC on the next pass.
+# - Basal / Keratinocyte / Salivary/Submucosal_glands / Mesothelium /
+#   Melanocyte / Myoblast/myocyte are non-colonic lineages that should
+#   be ~empty after load_pangi's ORGAN_KEEP filter; mappings are kept
+#   because the categorical dtype's `.categories` still lists the label
+#   even at zero cells and gate (2) checks the full label set.
+# - "Unknown" has no biological broad bucket. Mapping to "fibroblast"
+#   is a PLACEHOLDER; preferred handling is to exclude these cells
+#   before broad-tier concordance (candidate: add a
+#   PANGI_EXCLUDE_LEVEL_2 set + filter in main() on the next pass).
 PANGI_TO_BROAD: dict[str, str] = {
-    # TODO(pangi-first-run): populate for the level_2_annot label set.
-    # Until then, gate (2) raises listing the actual labels.
+    # B / plasma lineage
+    "B_plasma":                    "plasma cell",
+    "Immature_B":                  "B cell",
+    "Mature_B":                    "B cell",
+    # T / NK / ILC
+    "Conventional_CD4":            "T cell",
+    "Conventional_CD8":            "T cell",
+    "Treg":                        "T cell",
+    "Cycling_T/NK":                "T cell",
+    "Unconventional_T/ILC":        "T cell",
+    "NK":                          "NK/ILC",
+    # Myeloid
+    "Macrophage":                  "monocyte/macrophage",
+    "Monocyte":                    "monocyte/macrophage",
+    "DC":                          "dendritic cell",
+    "Granulocyte":                 "granulocyte",
+    # Non-mucosal blood-lineage — see scope note (contamination-prone)
+    "Erythrocyte":                 "granulocyte",
+    "Megakaryocyte/platelet":      "granulocyte",
+    # Colonic epithelium
+    "Absorptive":                  "colonocyte",
+    "Microfold":                   "colonocyte",  # M cells; FAE-specialized
+    "Secretory":                   "goblet",
+    "Enteroendocrine":             "enteroendocrine/tuft",
+    "Epithelial_progenitor":       "epithelial progenitor",
+    "Epithelial_stem":             "epithelial progenitor",
+    "Transit_amplifying":          "epithelial progenitor",
+    "Cycling_epithelia":           "epithelial progenitor",
+    # Non-colonic epithelium (should be ~empty post-ORGAN_KEEP)
+    "Basal":                       "epithelial progenitor",
+    "Keratinocyte":                "epithelial progenitor",
+    "Salivary/Submucosal_glands":  "goblet",       # mucus-secretory glands
+    "Mesothelium":                 "fibroblast",   # mesodermal, imperfect fit
+    # Endothelia
+    "Vascular_endothelia":         "endothelium",
+    "Lymphatic_endothelia":        "endothelium",
+    "Cycling_endothelia":          "endothelium",
+    # Stroma / fibroblast
+    "Fibroblast":                  "fibroblast",
+    "Myofibroblast":               "fibroblast",
+    "Lymphoid_stromal_cell":       "fibroblast",   # FRC-like
+    "Mesoderm":                    "fibroblast",   # mesenchymal default
+    # Mural / glia / neural
+    "Pericyte":                    "mural/glia",
+    "Smooth_muscle":               "mural/glia",
+    "Myoblast/myocyte":            "mural/glia",
+    "Intestinal_Cajal_cell":       "mural/glia",   # gut pacemaker
+    "Glia":                        "mural/glia",
+    "Neuron":                      "mural/glia",
+    "Neuron_progenitor":           "mural/glia",
+    "Melanocyte":                  "mural/glia",   # neural-crest lineage
+    # Ambiguous — see 'Unknown' note above
+    "Unknown":                     "fibroblast",
 }
 
 # Gate (1): every value the map ships must be in the canonical vocab.
