@@ -299,6 +299,25 @@ def main():
             "--flag-filter-data False --flag-raw-count False",
     }
 
+    # ---- Sanitize obs for h5py serialization ----
+    # CELLxGENE Pan-GI obs ships ~38 columns; several arrive as
+    # object-dtype with mixed str/NaN (e.g. 'batch') which h5py can't
+    # write — TypeError: "Can't implicitly convert non-string objects to
+    # strings". Coerce every object-dtype obs column to str; NaN becomes
+    # literal "NA" so downstream lookups get a stable key. Applied
+    # generically because any other object column would trip the same
+    # crash and we don't want a whack-a-mole cycle across future atlases.
+    coerced = []
+    for col in adata.obs.columns:
+        if pd.api.types.is_object_dtype(adata.obs[col]):
+            adata.obs[col] = adata.obs[col].fillna("NA").astype(str)
+            coerced.append(col)
+    if coerced:
+        logger.info(
+            "[driver] coerced %d object-dtype obs cols to str for h5py: %s",
+            len(coerced), coerced,
+        )
+
     adata.write_h5ad(a.out_h5ad)
     print(
         f"[driver] wrote {a.out_h5ad}: {adata.n_obs} cells x "
