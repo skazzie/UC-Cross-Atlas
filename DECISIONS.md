@@ -3470,3 +3470,21 @@ nest in donors -> collinear). Applies to ALL remaining atlas loaders (HCA, Pan-G
 STATUS: TAURUS scDRS 2x2 running (128GB). Pan-GI needs run_pangi_load.py driver
 (CC writing, with all TAURUS lessons). VM on e2-highmem-16 (128GB) — resize back to
 64GB after heavy loads to save cost.
+
+## 2026-08-11: Cross-method concordance on three atlases (8 rows)
+scdrs_vs_seismic.csv, MHC-excluded pairing, Spearman(scDRS assoc_mcz, seismic -log10 p):
+  smillie  delange broad 0.675 (p.008, n=14) / fine 0.405 (p.003, n=51)
+  garrido  delange broad 0.525 (p.044, n=15) / fine 0.480 (p1.3e-5, n=75)
+  garrido  liu     broad 0.696 (p.004, n=15) / fine 0.370 (p.001, n=75)
+  taurus   delange broad 0.709 (p.015, n=11) / fine 0.576 (p1.6e-4, n=38)
+All eight positive and significant. TAURUS is the strongest at both tiers.
+CAVEAT worth reporting: on TAURUS the top-ranked type DIFFERS by method
+(scDRS: colonocyte, mcz 4.18; seismic: monocyte/macrophage, FDR 0.012 — the first
+FDR-significant seismic hit in the project). High rho reflects agreement across the
+full ordering, especially the shared bottom; the head is method-dependent. Frame as
+"methods agree on ordering, disagree on the top hit," not as concordance full stop.
+Gaps now explicit via loud skips: smillie x liu and taurus x liu scDRS not yet run
+(4 of 12 pairs skipped).
+NOTE: TAURUS seismic p-values are analytic (run_perm=FALSE). constants.py locks
+SEISMIC_N_PERMUTATIONS=1000 — the FDR 0.012 myeloid hit needs a permutation run
+before it can carry any headline claim.
