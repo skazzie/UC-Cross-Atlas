@@ -33,8 +33,10 @@ EXPECTED_OBS_COLS = (
 DISEASE_KEEP = (
     "normal",
     "ulcerative colitis",
-    "inflammatory bowel disease",
 )
+# "inflammatory bowel disease" dropped 2026-08-11: entire bucket is
+# Huang2019 (pediatric IBD, unresolved CD/UC), not adult UC. Every other
+# atlas in the project is adult UC. See DECISIONS 2026-08-11.
 
 ORGAN_KEEP = (
     "ascending colon",
@@ -47,6 +49,13 @@ ORGAN_KEEP = (
 )
 
 EXCLUDE_SAMPLE_TYPE = "Organ_donor_resection"
+
+# Study-level exclusion. Applied on top of DISEASE_KEEP so both diseased
+# AND normal cells from these studies are dropped — required for Huang2019
+# whose 22,626 healthy cells would otherwise contaminate the reference
+# pool as pediatric, largely-pooled-donor (Dpool1..Dpool4, 51,675 of
+# 60,124 cells) samples. See DECISIONS 2026-08-11.
+STUDY_EXCLUDE = ("Huang2019",)
 
 # Conservative pattern for Smillie 2019 donor IDs as documented in
 # DECISIONS.md correction (3/7) point 4. Smillie's naming convention is
@@ -87,10 +96,18 @@ def load(
         )
 
     if apply_v1_filter:
-        m = (
-            adata.obs["disease"].isin(DISEASE_KEEP)
-            & adata.obs["organ_unified"].isin(ORGAN_KEEP)
-            & (adata.obs["sample_type"] != EXCLUDE_SAMPLE_TYPE)
+        disease_ok = adata.obs["disease"].isin(DISEASE_KEEP)
+        organ_ok = adata.obs["organ_unified"].isin(ORGAN_KEEP)
+        sample_ok = adata.obs["sample_type"] != EXCLUDE_SAMPLE_TYPE
+        study_ok = ~adata.obs["study"].isin(STUDY_EXCLUDE)
+        m = disease_ok & organ_ok & sample_ok & study_ok
+        # Report Huang2019 drops among cells that would otherwise have passed —
+        # provenance for the study-level exclusion (DECISIONS 2026-08-11).
+        n_study_excl = int((disease_ok & organ_ok & sample_ok & ~study_ok).sum())
+        logger.info(
+            "Pan-GI v1 filter: STUDY_EXCLUDE=%s dropped %d cells "
+            "(within disease/organ/sample_type keep set)",
+            list(STUDY_EXCLUDE), n_study_excl,
         )
         n_drop = int((~m).sum())
         n_keep = int(m.sum())
@@ -154,6 +171,12 @@ def load_pangi_no_elmentaite(
 
     Tests whether HCA Gut donor overlap drives Pan-GI cell-type
     prioritization. See DECISIONS.md correction (3/7).
+
+    NOTE (2026-08-11): under ``apply_v1_filter=True`` this is empirically
+    a no-op — Elmentaite2021 carries no UC-disease label, so the UC ×
+    colonic v1 filter already drops every Elmentaite cell. Kept for
+    provenance and for the ``apply_v1_filter=False`` path. See DECISIONS
+    2026-08-11 (Pan-GI scope) for the overlap-caveat consequence.
     """
     adata = load(
         h5ad_path,

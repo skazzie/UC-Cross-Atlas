@@ -3488,3 +3488,44 @@ Gaps now explicit via loud skips: smillie x liu and taurus x liu scDRS not yet r
 NOTE: TAURUS seismic p-values are analytic (run_perm=FALSE). constants.py locks
 SEISMIC_N_PERMUTATIONS=1000 — the FDR 0.012 myeloid hit needs a permutation run
 before it can carry any headline claim.
+
+## 2026-08-11: Pan-GI scope — drop IBD bucket, exclude Huang2019, Elmentaite no-op
+
+Three scope decisions in load_pangi.py.
+
+(1) DISEASE_KEEP shrunk from ("normal", "ulcerative colitis", "inflammatory bowel
+disease") to ("normal", "ulcerative colitis"). The entire "inflammatory bowel
+disease" bucket in Pan-GI is one study — Huang2019, 37,498 cells — with
+donor_disease='PIBD' and control_vs_disease='pediatric_IBD'. That is pediatric
+IBD, unresolved between CD and UC; every other atlas in this project is adult UC,
+so the label doesn't match on disease OR age. Additionally, 51,675 of Huang2019's
+60,124 cells carry pooled donor IDs (Dpool1..Dpool4), so donor-level covariates
+are not constructible for them regardless of the disease label. The bucket fails
+both the "matched disease" and "constructible cov" bars.
+
+(2) Huang2019 excluded at the study level via new STUDY_EXCLUDE=("Huang2019",),
+so its 22,626 healthy cells are also dropped, not just the 37,498 IBD-labeled
+ones. Rationale: those 22,626 healthy cells would otherwise remain in the
+reference pool as pediatric, largely-pooled-donor samples — importing the same
+age-mismatch and donor-cov problems that motivated the disease-side drop. Cleaner
+to exclude the study entirely than to keep half of a problematic cohort.
+
+(3) Elmentaite (HCA Gut) finding — DECISIONS-only, no code change beyond
+docstring. Pan-GI's `study` column contains "Elmentaite2021" verbatim, but the
+UC × colonic v1 filter drops ALL of them (Elmentaite is Pan-GI's healthy
+HCA-reference contribution and carries no UC-disease label; not in DISEASE_KEEP).
+Consequences on the UC subset we actually analyze:
+  - `load_pangi_no_elmentaite` is a no-op under apply_v1_filter=True (verify via
+    the existing "Elmentaite2021 cells (HCA Gut overlap): N" log line — should
+    read 0 on every UC-filtered run).
+  - HCA Gut and Pan-GI-as-analyzed are DISJOINT. The "HCA nested in Pan-GI"
+    caveat from the canonical roster header is VOID for the UC subset; it
+    remains true of Pan-GI's full 1.6M-cell deposit, but that superset never
+    enters our results.
+  - The Pan-GI-vs-HCA independence check on the UC subset is trivially satisfied
+    and no longer requires a sensitivity run to defend it.
+
+The upstream cell-count change from (1) + (2): the Huang2019 IBD-bucket drop is
+~37.5k cells that were previously kept as "IBD"; the study-level normal-cell drop
+is 22.6k cells on top. Rerun run_pangi_load.py to get the new post-filter counts
+into the log.
