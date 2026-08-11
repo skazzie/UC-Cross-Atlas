@@ -21,6 +21,12 @@ SCDRS_N_CTRL: int = 1000
 SEISMIC_N_PERMUTATIONS: int = 1000
 
 UC_ATLASES: tuple[str, ...] = ("smillie", "garrido_trigo", "taurus")
+# Broad-comparator atlases — separate from UC_ATLASES so modules with
+# core-UC-only semantics (Brown's meta, cross-atlas concordance, kappa
+# saturation) don't accidentally pull comparator rows in. Cross-method
+# concordance opts in explicitly by iterating UC_ATLASES + COMPARATOR_ATLASES
+# and stamping is_comparator on the output. See DECISIONS canonical roster.
+COMPARATOR_ATLASES: tuple[str, ...] = ("pangi", "hca_gut")
 UC_GWAS: tuple[str, ...] = ("delange", "liu")
 METHODS: tuple[str, ...] = ("scdrs", "seismic")
 TIERS: tuple[str, ...] = ("broad", "fine")

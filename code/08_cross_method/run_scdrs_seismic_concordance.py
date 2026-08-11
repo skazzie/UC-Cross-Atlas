@@ -23,18 +23,26 @@ MHC pairing
     operating on different gene sets.
 
 Pair construction
-    Pairs are built from UC_ATLASES x UC_GWAS x TIERS (see
-    _shared.constants), so adding an atlas to UC_ATLASES automatically
-    picks it up here. Per-(atlas, gwas) scDRS group-dir naming
-    conventions differ, so SCDRS_GROUP_DIRS below is an explicit
+    Pairs are built from (UC_ATLASES + COMPARATOR_ATLASES) x UC_GWAS x
+    TIERS (see _shared.constants), so adding an atlas to either roster
+    automatically picks it up here. Per-(atlas, gwas) scDRS group-dir
+    naming conventions differ, so SCDRS_GROUP_DIRS below is an explicit
     atlas -> gwas -> dirname map. Seismic path is the locked convention
     results/seismic/{atlas}_{gwas}_{tier}.tsv.
 
-    Every missing file logs an explicit skip so a silently-absent atlas
-    is impossible — the failure mode that previously hid TAURUS.
+    Every missing file — and every (atlas, gwas) not yet wired into
+    SCDRS_GROUP_DIRS — logs an explicit skip so a silently-absent atlas
+    is impossible (the failure mode that previously hid TAURUS, and that
+    would have hidden Pan-GI before the comparator-roster split).
+
+    Comparator vs core distinction is preserved via an is_comparator
+    boolean stamped on each output row: True iff atlas is in
+    COMPARATOR_ATLASES. Downstream reporting can group by it to keep
+    UC-only vs broad-comparator concordance separate.
 
 Output columns
-    atlas, gwas, tier, n_cell_types_matched, spearman_rho, spearman_pval
+    atlas, is_comparator, gwas, tier,
+    n_cell_types_matched, spearman_rho, spearman_pval
 
 Usage
     python code/08_cross_method/run_scdrs_seismic_concordance.py \\
@@ -58,7 +66,12 @@ LOGGER = logging.getLogger(Path(__file__).stem)
 _REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO / "code"))
 sys.path.insert(0, str(_REPO / "code" / "06_concordance"))
-from _shared.constants import TIERS, UC_ATLASES, UC_GWAS  # noqa: E402
+from _shared.constants import (  # noqa: E402
+    COMPARATOR_ATLASES,
+    TIERS,
+    UC_ATLASES,
+    UC_GWAS,
+)
 from metrics import spearman  # noqa: E402
 
 
@@ -71,6 +84,11 @@ from metrics import spearman  # noqa: E402
 #   smillie:                 fullcov MHC-excluded (locked-primary per DECISIONS.md)
 #   taurus:                  MHC-excluded; delange only exists today, liu will
 #                            skip cleanly until the run lands.
+#   pangi:                   MHC-excluded; delange running now, liu will skip
+#                            cleanly until the run lands. Comparator atlas.
+#   hca_gut:                 not yet loaded — no entry; build_manifest logs a
+#                            loud "no SCDRS_GROUP_DIRS entry" skip per (gwas,
+#                            tier) so the atlas can't be silently missing.
 # Entries whose files don't exist yet skip via the file-existence check in
 # _compute — they must still appear here or the (atlas, gwas) is silently dropped.
 SCDRS_GROUP_DIRS: dict[str, dict[str, str]] = {
@@ -86,6 +104,10 @@ SCDRS_GROUP_DIRS: dict[str, dict[str, str]] = {
         "delange": "taurus_delange_excl_group",
         "liu": "taurus_liu_excl_group",
     },
+    "pangi": {
+        "delange": "pangi_delange_excl_group",
+        "liu": "pangi_liu_excl_group",
+    },
 }
 
 SCDRS_GROUP_FILE_TEMPLATE = "UC.scdrs_group.cell_type_{tier}"
@@ -94,6 +116,7 @@ SEISMIC_PATH_TEMPLATE = "results/seismic/{atlas}_{gwas}_{tier}.tsv"
 
 class Pair(NamedTuple):
     atlas: str
+    is_comparator: bool
     gwas: str
     tier: str
     scdrs: str  # repo-relative path
@@ -101,13 +124,16 @@ class Pair(NamedTuple):
 
 
 def build_manifest() -> list[Pair]:
-    """Cartesian product of UC_ATLASES x UC_GWAS x TIERS, resolved to paths.
+    """Cartesian product of (UC_ATLASES + COMPARATOR_ATLASES) x UC_GWAS x TIERS.
 
     An (atlas, gwas) with no SCDRS_GROUP_DIRS entry is skipped with a warning
-    so an atlas added to UC_ATLASES but not wired here is loud, not silent.
+    so an atlas added to either roster but not wired here is loud, not silent.
+    is_comparator is True iff the atlas is in COMPARATOR_ATLASES.
     """
+    all_atlases = tuple(UC_ATLASES) + tuple(COMPARATOR_ATLASES)
+    comparator_set = set(COMPARATOR_ATLASES)
     pairs: list[Pair] = []
-    for atlas, gwas, tier in product(UC_ATLASES, UC_GWAS, TIERS):
+    for atlas, gwas, tier in product(all_atlases, UC_GWAS, TIERS):
         group_dir = SCDRS_GROUP_DIRS.get(atlas, {}).get(gwas)
         if group_dir is None:
             LOGGER.warning(
@@ -118,7 +144,7 @@ def build_manifest() -> list[Pair]:
             continue
         scdrs = f"results/scdrs/{group_dir}/{SCDRS_GROUP_FILE_TEMPLATE.format(tier=tier)}"
         seismic = SEISMIC_PATH_TEMPLATE.format(atlas=atlas, gwas=gwas, tier=tier)
-        pairs.append(Pair(atlas, gwas, tier, scdrs, seismic))
+        pairs.append(Pair(atlas, atlas in comparator_set, gwas, tier, scdrs, seismic))
     return pairs
 
 
@@ -168,7 +194,8 @@ def _compute(pair: Pair, repo: Path) -> dict | None:
                 pair.atlas, pair.gwas, pair.tier, n_matched, len(sd), len(ss))
 
     if n_matched < 3:
-        return {"atlas": pair.atlas, "gwas": pair.gwas, "tier": pair.tier,
+        return {"atlas": pair.atlas, "is_comparator": pair.is_comparator,
+                "gwas": pair.gwas, "tier": pair.tier,
                 "n_cell_types_matched": n_matched,
                 "spearman_rho": float("nan"), "spearman_pval": float("nan")}
 
@@ -181,7 +208,8 @@ def _compute(pair: Pair, repo: Path) -> dict | None:
     # No min-cell filter here (both counts=None -> filter disabled); the
     # inner-join is already the shared cell-type set.
     rho, pval, n_kept, _ = spearman(scores_a, scores_b)
-    return {"atlas": pair.atlas, "gwas": pair.gwas, "tier": pair.tier,
+    return {"atlas": pair.atlas, "is_comparator": pair.is_comparator,
+            "gwas": pair.gwas, "tier": pair.tier,
             "n_cell_types_matched": n_kept,
             "spearman_rho": rho, "spearman_pval": pval}
 
@@ -202,8 +230,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     manifest = build_manifest()
-    LOGGER.info("Attempting %d (atlas, gwas, tier) pairs from UC_ATLASES x UC_GWAS x TIERS",
-                len(manifest))
+    LOGGER.info(
+        "Attempting %d (atlas, gwas, tier) pairs from "
+        "(UC_ATLASES + COMPARATOR_ATLASES) x UC_GWAS x TIERS",
+        len(manifest),
+    )
 
     rows = []
     for pair in manifest:
@@ -216,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     out = pd.DataFrame(rows, columns=[
-        "atlas", "gwas", "tier",
+        "atlas", "is_comparator", "gwas", "tier",
         "n_cell_types_matched", "spearman_rho", "spearman_pval",
     ])
     args.out.parent.mkdir(parents=True, exist_ok=True)
