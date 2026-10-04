@@ -8,14 +8,16 @@
 
 # ---- Project locations ---------------------------------------------------
 
-# The cloned repo on Hummingbird (small files, $HOME quota is fine).
-export UCC_REPO="${UCC_REPO:-$HOME/uc-cross-atlas}"
+# The cloned repo on Hummingbird. Lives on scratch (not $HOME) because
+# $HOME has no space for atlas data and Hummingbird's convention is to
+# work out of /hb/scratch/$USER/. Verified 2026-10-03 (rebuild handoff).
+export UCC_REPO="${UCC_REPO:-/hb/scratch/mukhinda/UC-Cross-Atlas}"
 
-# Big files (atlases, references, results) live on scratch, not $HOME.
-# Hummingbird scratch path; verify the convention for your group:
-#   /hb/scratch/$USER/...   per-user
-#   /hb/groups/<group>/...  shared
-export UCC_SCRATCH="${UCC_SCRATCH:-/hb/scratch/$USER/uc-cross-atlas}"
+# Big files (atlases, references, results) live under scratch/ inside
+# the repo tree — matches the "scratch/data/..." relative paths baked
+# into drivers and the handoff. Override UCC_SCRATCH if you want to put
+# the data tree somewhere else.
+export UCC_SCRATCH="${UCC_SCRATCH:-$UCC_REPO/scratch}"
 export UCC_DATA="$UCC_SCRATCH/data"
 export UCC_RESULTS="$UCC_SCRATCH/results"
 export UCC_LOGS="$UCC_SCRATCH/logs"
@@ -35,7 +37,7 @@ export UCC_PARTITION_HIGHMEM="${UCC_PARTITION_HIGHMEM:-256x44}"
 export UCC_ACCOUNT="${UCC_ACCOUNT:-128x24}"
 
 # Email for SLURM notifications.
-export UCC_EMAIL="${UCC_EMAIL:-amoli@ucsc.edu}"
+export UCC_EMAIL="${UCC_EMAIL:-mukhinda@ucsc.edu}"
 
 # Conda env name.
 export UCC_CONDA_ENV="${UCC_CONDA_ENV:-uc-cross-atlas}"
