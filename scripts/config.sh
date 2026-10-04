@@ -13,14 +13,31 @@
 # work out of /hb/scratch/$USER/. Verified 2026-10-03 (rebuild handoff).
 export UCC_REPO="${UCC_REPO:-/hb/scratch/mukhinda/UC-Cross-Atlas}"
 
-# Big files (atlases, references, results) live under scratch/ inside
-# the repo tree — matches the "scratch/data/..." relative paths baked
-# into drivers and the handoff. Override UCC_SCRATCH if you want to put
-# the data tree somewhere else.
+# Big input files (atlases, references, GWAS summary stats) live under
+# scratch/ inside the repo tree — matches the "scratch/data/..." relative
+# paths baked into drivers and the handoff. Override UCC_SCRATCH if you
+# want to put the data tree somewhere else.
 export UCC_SCRATCH="${UCC_SCRATCH:-$UCC_REPO/scratch}"
 export UCC_DATA="$UCC_SCRATCH/data"
-export UCC_RESULTS="$UCC_SCRATCH/results"
 export UCC_LOGS="$UCC_SCRATCH/logs"
+
+# Analysis outputs (scDRS group tables, seismic TSVs, concordance CSV)
+# live at REPO-ROOT results/ — that's what
+# code/08_cross_method/run_scdrs_seismic_concordance.py resolves relative
+# to the repo root (`results/scdrs/{group_dir}/...`,
+# `results/seismic/{atlas}_{gwas}_{tier}.tsv`,
+# `results/concordance/scdrs_vs_seismic.csv`), and .gitignore's
+# `results/*` rule assumes the folder is at repo root (keeping
+# `results/.gitkeep` + `results/MANIFEST.md` tracked). Don't move this
+# into scratch — concordance will stop finding the files.
+export UCC_RESULTS="${UCC_RESULTS:-$UCC_REPO/results}"
+
+# MAGMA intermediates (`.genes.out`, `.lambda_gc.tsv`, `.snp.loc` etc.)
+# are big and never read back from results/ — only `make_scdrs_gs.py`
+# consumes them, and the downstream artifacts (`${gwas}_top1000.gs`,
+# `${gwas}_gene_z.tsv`) land in `$UCC_DATA/gwas/`. Keep MAGMA output on
+# scratch so it doesn't bloat the committed-folder tree.
+export UCC_MAGMA_OUT="${UCC_MAGMA_OUT:-$UCC_SCRATCH/results/magma}"
 
 # ---- SLURM parameters ----------------------------------------------------
 
@@ -51,8 +68,8 @@ mkdir -p \
     "$UCC_DATA/atlases" \
     "$UCC_DATA/atlases/donor_metadata" \
     "$UCC_DATA/reference" \
+    "$UCC_MAGMA_OUT" \
     "$UCC_RESULTS" \
-    "$UCC_RESULTS/magma" \
     "$UCC_RESULTS/scdrs" \
     "$UCC_RESULTS/seismic" \
     "$UCC_RESULTS/concordance" \

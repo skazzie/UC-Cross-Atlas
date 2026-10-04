@@ -84,7 +84,7 @@ python code/01_magma/prepare_gwas.py \
     --out-prefix "$OUT_PREFIX" \
     --col-snp "$COL_SNP" --col-chr "$COL_CHR" --col-bp "$COL_BP" \
     --col-p "$COL_P" --n-fixed "$N_FIXED" \
-    --lambda-gc-out "$UCC_RESULTS/magma/${GWAS}_lambda_gc.tsv"
+    --lambda-gc-out "$UCC_MAGMA_OUT/${GWAS}_lambda_gc.tsv"
 
 # ---- 2. MAGMA annotate + gene-test ---------------------------------------
 
@@ -92,19 +92,19 @@ bash code/01_magma/run_magma.sh \
     "${OUT_PREFIX}.snp.loc" "${OUT_PREFIX}.pval" \
     "$UCC_DATA/reference/NCBI37.3.gene.loc" \
     "$UCC_DATA/reference/g1000_eur" \
-    10 "$UCC_RESULTS/magma/${GWAS}_10kb"
+    10 "$UCC_MAGMA_OUT/${GWAS}_10kb"
 
 # ---- 3. Sanity check (top genes match expected pattern) ------------------
 
 python code/01_magma/sanity_check.py \
-    --genes-out "$UCC_RESULTS/magma/${GWAS}_10kb.genes.out" \
+    --genes-out "$UCC_MAGMA_OUT/${GWAS}_10kb.genes.out" \
     --gene-loc "$UCC_DATA/reference/NCBI37.3.gene.loc" \
     --trait-class "$TRAIT_CLASS"
 
 # ---- 4. .gs file + gene-Z table (MHC excluded) ---------------------------
 
 python code/01_magma/make_scdrs_gs.py \
-    --genes-out "$UCC_RESULTS/magma/${GWAS}_10kb.genes.out" \
+    --genes-out "$UCC_MAGMA_OUT/${GWAS}_10kb.genes.out" \
     --gene-loc "$UCC_DATA/reference/NCBI37.3.gene.loc" \
     --trait "$TRAIT" --top-n 1000 \
     --out "$UCC_DATA/gwas/${GWAS}_top1000.gs" \
@@ -114,7 +114,7 @@ python code/01_magma/make_scdrs_gs.py \
 
 if [ "$GWAS" = "delange" ]; then
     python code/01_magma/make_scdrs_gs.py \
-        --genes-out "$UCC_RESULTS/magma/${GWAS}_10kb.genes.out" \
+        --genes-out "$UCC_MAGMA_OUT/${GWAS}_10kb.genes.out" \
         --gene-loc "$UCC_DATA/reference/NCBI37.3.gene.loc" \
         --trait "$TRAIT" --top-n 1000 \
         --out "$UCC_DATA/gwas/${GWAS}_top1000_with_mhc.gs" \
