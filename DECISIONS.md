@@ -3529,3 +3529,36 @@ The upstream cell-count change from (1) + (2): the Huang2019 IBD-bucket drop is
 ~37.5k cells that were previously kept as "IBD"; the study-level normal-cell drop
 is 22.6k cells on top. Rerun run_pangi_load.py to get the new post-filter counts
 into the log.
+
+---
+
+## 2026-10-03: Pan-GI UUID reconciled — asset 757945c8..., not deposit 1dcf15ee...
+
+The GCP-era Pan-GI source pin in `load_pangi.py` was
+`1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8` (CELLxGENE's **deposit** UUID at
+submission). The actual h5ad download URL on
+`datasets.cellxgene.cziscience.com` uses the **asset** UUID
+`757945c8-a916-431d-aceb-1afbc80a7c55` — the deposit UUID 404s. Both IDs
+reference the same Oliver 2024 Pan-GI Extended+ deposit (Nature 635:699,
+1,596,200 cells pre-filter), but only the asset UUID resolves.
+
+This came up during the Hummingbird rebuild (handoff 2026-10-03): the
+earlier download that produced the GCP results used the asset URL
+(working), while the docstring and `atlas_schemas.md` pinned the deposit
+UUID (unused by `wget`, so the mismatch went unnoticed until the rebuild
+needed a reproducible pin).
+
+Reconciled on 2026-10-03:
+  - `code/02_atlas_prep/load_pangi.py` module docstring now pins
+    `757945c8-...` and notes the deposit→asset reconciliation.
+  - `code/02_atlas_prep/run_pangi_load.py` module docstring + the
+    `--h5ad` argparse help string use the asset UUID.
+  - `code/02_atlas_prep/atlas_schemas.md` Pan-GI "Download URL" updated
+    to the asset URL with a short reconciliation note.
+  - `scripts/build_celltype_crosswalk.py` `paper_ref` for Pan-GI uses the
+    asset UUID; the derived `data/atlases/celltype_crosswalk.tsv` picks
+    up the new string on next regen.
+
+No scientific impact — the atlas content is identical; this is a
+provenance-string fix. Noting here so a future reader doesn't try to curl
+the deposit UUID and conclude the atlas has been pulled from CELLxGENE.

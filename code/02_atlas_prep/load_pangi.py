@@ -1,8 +1,17 @@
 """Loader for Pan-GI Extended+ broad atlas (Oliver 2024).
 
-Source: CELLxGENE deposit 1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8.h5ad
+Source: CELLxGENE deposit 757945c8-a916-431d-aceb-1afbc80a7c55.h5ad
+(download URL: https://datasets.cellxgene.cziscience.com/757945c8-a916-431d-aceb-1afbc80a7c55.h5ad).
+
+The GCP-era pin was ``1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8`` (CELLxGENE's
+*deposit* UUID at submission); CELLxGENE issues a separate *asset* UUID
+for the actual h5ad download, and the asset UUID is the one that
+resolves on ``datasets.cellxgene.cziscience.com``. The deposit UUID 404s.
+Reconciled 2026-10-03 during the Hummingbird rebuild — see DECISIONS.
+
 Reference: ``code/02_atlas_prep/atlas_schemas.md``;
-DECISIONS.md correction 2026-05-20 (3/7), (5/7).
+DECISIONS.md correction 2026-05-20 (3/7), (5/7); DECISIONS 2026-10-03
+(Pan-GI UUID reconcile).
 """
 
 from __future__ import annotations

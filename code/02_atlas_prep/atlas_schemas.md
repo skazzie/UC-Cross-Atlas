@@ -169,7 +169,9 @@ session that wrote correction (8) to verify Ribhi = ribosomal-high state.
 ## pangi
 
 - **Source**: CELLxGENE
-- **Download URL**: https://datasets.cellxgene.cziscience.com/1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8.h5ad
+- **Download URL**: https://datasets.cellxgene.cziscience.com/757945c8-a916-431d-aceb-1afbc80a7c55.h5ad
+  (reconciled 2026-10-03 from the stale deposit UUID 1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8;
+  the deposit UUID 404s on datasets.cellxgene.cziscience.com. See DECISIONS 2026-10-03.)
 - **File size**: estimated 15-25 GB (verify with `curl -I` before downloading)
 - **n_cells**: 1,596,200 (full atlas) / ~150-200k expected after v1 filter
 - **Studies integrated**: 25 source studies including Elmentaite2021

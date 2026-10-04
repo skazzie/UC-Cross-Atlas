@@ -1,8 +1,10 @@
 """Driver: load Pan-GI Extended+, remap cell_type_broad to canonical
 vocab, precompute neighbors, and write h5ad + partial covariate file.
 
-Source pin: CELLxGENE deposit 1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8.h5ad;
-see ``code/02_atlas_prep/atlas_schemas.md``.
+Source pin: CELLxGENE asset 757945c8-a916-431d-aceb-1afbc80a7c55.h5ad
+(reconciled from the stale deposit UUID 1dcf15ee... on 2026-10-03; see
+``load_pangi.py`` module docstring and DECISIONS 2026-10-03). See
+``code/02_atlas_prep/atlas_schemas.md`` for the full source table.
 
 Applies every fix worked out during the TAURUS debug loop:
 
@@ -217,7 +219,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--h5ad", required=True,
                    help="Pan-GI CELLxGENE h5ad "
-                        "(1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8.h5ad)")
+                        "(757945c8-a916-431d-aceb-1afbc80a7c55.h5ad)")
     # Defaults are cwd-relative (no ../../ prefix): if the driver is
     # invoked from the repo root (VM convention), scratch/data/atlases/
     # resolves correctly. Override if you invoke from elsewhere.

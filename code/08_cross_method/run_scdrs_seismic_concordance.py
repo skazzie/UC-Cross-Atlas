@@ -77,28 +77,21 @@ from metrics import spearman  # noqa: E402
 
 # atlas -> gwas -> scDRS group dir under results/scdrs/.
 # All entries reference MHC-EXCLUDED scDRS runs (matches seismic's MHC-excluded
-# gene-Z). Conventions genuinely differ per (atlas, gwas) — see results/MANIFEST.md
-# for provenance:
-#   garrido_trigo x delange: smoketest run (VM 2026-07-07, depth+donor cov)
-#   garrido_trigo x liu:     non-smoketest run
-#   smillie:                 fullcov MHC-excluded (locked-primary per DECISIONS.md)
-#   taurus:                  MHC-excluded; delange only exists today, liu will
-#                            skip cleanly until the run lands.
-#   pangi:                   MHC-excluded; delange running now, liu will skip
-#                            cleanly until the run lands. Comparator atlas.
-#   hca_gut:                 not yet loaded — no entry; build_manifest logs a
-#                            loud "no SCDRS_GROUP_DIRS entry" skip per (gwas,
-#                            tier) so the atlas can't be silently missing.
-# Entries whose files don't exist yet skip via the file-existence check in
-# _compute — they must still appear here or the (atlas, gwas) is silently dropped.
+# gene-Z). Standardised naming after the Hummingbird rebuild (2026-10-03):
+# ${atlas}_${gwas}_excl_group, matching scripts/slurm/03_scdrs_compute.slurm.
+# The GCP-era historical accidents (garrido_delange_smoketest_group,
+# smillie_delange_excl_fullcov_group, taurus_delange_excl_group) are gone —
+# the rebuild writes everything under this uniform pattern. Entries whose
+# files don't exist yet skip via the file-existence check in _compute; they
+# must still appear here or the (atlas, gwas) is silently dropped.
 SCDRS_GROUP_DIRS: dict[str, dict[str, str]] = {
-    "garrido_trigo": {
-        "delange": "garrido_delange_smoketest_group",
-        "liu": "garrido_liu_group",
-    },
     "smillie": {
-        "delange": "smillie_delange_excl_fullcov_group",
-        "liu": "smillie_liu_excl_fullcov_group",
+        "delange": "smillie_delange_excl_group",
+        "liu": "smillie_liu_excl_group",
+    },
+    "garrido_trigo": {
+        "delange": "garrido_trigo_delange_excl_group",
+        "liu": "garrido_trigo_liu_excl_group",
     },
     "taurus": {
         "delange": "taurus_delange_excl_group",
@@ -107,6 +100,10 @@ SCDRS_GROUP_DIRS: dict[str, dict[str, str]] = {
     "pangi": {
         "delange": "pangi_delange_excl_group",
         "liu": "pangi_liu_excl_group",
+    },
+    "hca_gut": {
+        "delange": "hca_gut_delange_excl_group",
+        "liu": "hca_gut_liu_excl_group",
     },
 }
 

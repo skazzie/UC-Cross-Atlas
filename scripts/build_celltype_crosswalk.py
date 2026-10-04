@@ -726,10 +726,12 @@ def _build_pangi_rows() -> list[dict]:
         atlas="pangi",
         fine_col="level_3_annot",
         broad_col="level_2_annot (mapped via level_2_annot -> _BROAD_VOCAB)",
-        paper_ref=("Oliver et al., Nature 635:699 (2024); CELLxGENE deposit "
-                   "1dcf15ee-c103-4aaa-8b8c-0fc697fcccc8; draft from PMC11578898 "
-                   "Fig 1-4 captions (2026-06-27). Pan-GI integrates "
-                   "Smillie+Kong donors — donor-overlap scan flagged in DECISIONS."),
+        paper_ref=("Oliver et al., Nature 635:699 (2024); CELLxGENE asset "
+                   "757945c8-a916-431d-aceb-1afbc80a7c55 (reconciled from "
+                   "stale deposit UUID 1dcf15ee... on 2026-10-03; see "
+                   "DECISIONS); draft from PMC11578898 Fig 1-4 captions "
+                   "(2026-06-27). Pan-GI integrates Smillie+Kong donors — "
+                   "donor-overlap scan flagged in DECISIONS."),
         draft_fine=_PANGI_DRAFT_FINE,
         unseen_fine_est=_PANGI_UNSEEN_FINE_EST,
         structural_zeros=_PANGI_STRUCTURAL_ZEROS,
