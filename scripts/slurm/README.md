@@ -11,7 +11,7 @@ All templates ship with the Hummingbird-verified defaults:
 ```
 #SBATCH --partition=128x24
 #SBATCH --account=128x24
-#SBATCH --mail-user=amoli@ucsc.edu
+#SBATCH --mail-user=mukhinda@ucsc.edu
 ```
 
 To override at submit time (e.g., if a co-author runs the same scripts

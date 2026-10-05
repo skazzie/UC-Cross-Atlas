@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=amoli@ucsc.edu
+#SBATCH --mail-user=mukhinda@ucsc.edu
 #SBATCH --array=1-3
 # ^^ 3 seeds (1, 2, 3). Test-retest gates per DECISIONS.md:
 #    scDRS pass >= 0.9; seismicGWAS pass >= 0.999.
@@ -29,7 +29,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../config.sh"
 
 if command -v module >/dev/null 2>&1; then
-    module load miniconda3 || module load anaconda3 || true
+    module load miniconda3/3.13
+    module load git/2.52.0 || true
 fi
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$UCC_CONDA_ENV"

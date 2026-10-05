@@ -2,31 +2,54 @@
 
 Session handoff / project-state-of-truth. Purpose: stop re-deriving what's
 already done and stop assuming things are done that aren't. Last updated:
-2026-07-07.
+2026-10-05.
 
 This file is the human-readable status narrative. For the exact
 (atlas x method x GWAS x tier) file inventory, see `results/MANIFEST.md`.
 
 ---
 
-## Canonical machine (DECISION 2026-07-07)
+## Canonical machine (DECISION 2026-10-03, superseding 2026-07-07)
 
-**The GCP VM (`ucca-compute`) is the canonical compute + results machine
-going forward.** Hummingbird has NO results (confirmed 2026-07-07). Prior
-analysis outputs live on Muskaan's laptop (`C:\Users\muska\UC-Cross-Atlas`).
+**UCSC Hummingbird is the canonical compute + results machine going
+forward.** The GCP VM `ucca-compute` was deleted for non-payment; all VM
+results (scDRS group analyses, seismic TSVs, concordance CSV, MAGMA
+intermediates, processed `.h5ad` files, raw atlas downloads) were lost
+with it. The 175 MB results archive was built on the VM but never
+downloaded before deletion. Repo code survived intact on GitHub through
+`db3148c`. The GCP trial clock is gone.
 
-Consequence: all remaining heavy runs (Smillie / TAURUS / HCA / Pan-GI,
-both methods; concordance; test-retest; Brown's) will run on the VM. The
-GCP free-trial 90-day clock (started ~early July 2026, expires ~early
-October) is therefore a real deadline for the *analysis*, not just for any
-one session. Stop the VM between sessions to preserve the clock; it bills
-whenever running, not just when connected.
+Hummingbird layout (verified 2026-10-03, repo at `db3148c`):
+- Repo: `/hb/scratch/mukhinda/UC-Cross-Atlas` (cloned, pulled)
+- Data/results root: `/hb/scratch/mukhinda/UC-Cross-Atlas/scratch`
+- Account/partition: `128x24` (both; verified via `sacctmgr`)
+- Modules: `miniconda3/3.13` + `git/2.52.0`; **no system R, no system MAGMA** — both installed into the conda env or fetched as binaries
+- 72-core simultaneous cap, infinite partition walltime
 
-**Blocker created by this decision:** the atlas `.h5ad` + covariate files
-were built on the LAPTOP (all 5 harmonized there). They are NOT on the VM.
-Garrido was regenerated from raw on the VM today (see cell-count delta
-below). Before running any atlas on the VM, its `.h5ad` + `_covariates.tsv`
-must be transferred laptop -> VM, or regenerated on the VM from the loaders.
+See `HUMMINGBIRD_REBUILD.md` for the complete rebuild plan and the
+non-negotiable lessons preserved from GCP sessions.
+
+### Phase 1 — conda env rebuilt on Hummingbird (2026-10-05)
+
+Job `794999` COMPLETED in 44:38 (`128x24`, 16 GB, 4 cpus). Env name
+`uc-cross-atlas`. Verified: `scdrs 1.0.2`, `numpy 1.26.4`, `scanpy
+1.11.5`, `anndata 0.11.4`, `seismicGWAS 1.0.0`, R 4.5.3 with `remotes`,
+`optparse`, `Matrix`, `SingleCellExperiment`, `SummarizedExperiment`,
+`S4Vectors`, `data.table`, `dplyr`. `scripts/environment.yml` and
+`scripts/requirements.txt` re-exported from the live env.
+
+What broke in the first attempt (job `791207`) and the fix:
+`devtools::install_github()` on devtools >= 2.5 delegates to the
+`remotes` package and errors if it's not installed. The fix was to add
+`r-remotes` to the mamba install list and switch to
+`remotes::install_github("ylaboratory/seismic", upgrade="never")`
+directly, bypassing the devtools delegation layer entirely.
+
+The pip-only Brown's method dependency (`EmpiricalBrownsMethod`) was
+NOT installed — it does not exist on PyPI (see
+`code/07_regime2_meta/run_brown.py:11-14`); the algorithm is implemented
+inline in `run_brown.py`. The R binary from `bioconductor-empiricalbrownsmethod`
+IS installed for the few places that still shell out to R for Brown's.
 
 ---
 

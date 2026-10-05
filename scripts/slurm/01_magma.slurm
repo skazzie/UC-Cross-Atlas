@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=amoli@ucsc.edu
+#SBATCH --mail-user=mukhinda@ucsc.edu
 #
 # Runs the full MAGMA pipeline for one GWAS:
 #   prepare_gwas -> annotate -> gene-test -> sanity_check -> .gs + gene-Z table
@@ -29,7 +29,8 @@ source "$SCRIPT_DIR/../config.sh"
 
 # Activate conda env
 if command -v module >/dev/null 2>&1; then
-    module load miniconda3 || module load anaconda3 || true
+    module load miniconda3/3.13
+    module load git/2.52.0 || true
 fi
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$UCC_CONDA_ENV"
