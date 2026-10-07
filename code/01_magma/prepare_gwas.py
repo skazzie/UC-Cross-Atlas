@@ -4,7 +4,7 @@ Convert a GWAS summary statistics file into the two MAGMA inputs:
   - <prefix>.pval    : SNP, P, N      (whitespace-separated, with header)
 
 Locked v1 GWAS in this pipeline:
-  - de Lange 2017 UC (primary)              GWAS Catalog GCST004131
+  - de Lange 2017 UC (primary)              GWAS Catalog GCST004133
   - Liu 2023 multi-ancestry IBD (UC arm)    cross-GWAS sensitivity
   - Trubetskoy 2022 schizophrenia            negative control on Smillie
 
@@ -14,6 +14,23 @@ Pre-committed filters applied (DECISIONS.md):
   - drop p outside (0, 1]
   - drop MAF < 0.01 (if FRQ column is provided)
   - drop INFO < 0.6 (if INFO column is provided)
+
+Build-safe mode (DECISIONS correction 2026-10-07):
+  Pass --bim <plink.bim> to re-anchor every SNP to the LD-panel's
+  rsID+chr+bp. This drops SNPs not in the panel and overwrites any
+  build-mismatched chr/bp from the sumstats (de Lange's harmonised and
+  Liu's raw ship GRCh38 positions, which do not match the GRCh37
+  g1000_eur panel — SNPs get mis-assigned to neighbouring genes and
+  canonical UC loci like IL23R / PTPN22 end up with noise Z-scores).
+  --bim-match=rsid        join sumstats[col-snp] to bim[rsID]
+  --bim-match=chrpos      parse chr:pos from sumstats[col-snp] (handles
+                          'chr:pos', 'chr:pos_A1_A2', 'chr_pos_A1_A2'),
+                          join sumstats[(chr,bp)] to bim[(chr,bp)]
+  In both cases, the output rsID/chr/bp are bim's. For raw de Lange the
+  SNP id is MarkerName='chr:pos_A1_A2' build37-native (bim-match=chrpos
+  is a true-position join). For Liu use harmonised rsid + bim-match=rsid
+  (Liu's raw variant_id is build38 chr:pos and does not safely join on
+  position).
 
 The Liu 2023 download may include a per-SNP N column; if so, pass
 --col-n. If absent, pass --n-fixed and document the fixed-N approximation
@@ -45,6 +62,20 @@ def parse_args():
     p.add_argument("--maf-min", type=float, default=0.01)
     p.add_argument("--info-min", type=float, default=0.60)
     p.add_argument("--sep", default="\t")
+    p.add_argument(
+        "--bim",
+        default=None,
+        help="PLINK .bim path. If set, re-anchor every SNP to the panel's "
+             "rsID+chr+bp. Overrides --col-chr/--col-bp from sumstats.",
+    )
+    p.add_argument(
+        "--bim-match",
+        default="rsid",
+        choices=["rsid", "chrpos"],
+        help="Join key when --bim is set. 'rsid' = sumstats --col-snp -> "
+             "bim rsID. 'chrpos' = parse chr:pos from sumstats --col-snp "
+             "(handles ':' and '_' separators) and join on (chr,bp).",
+    )
     p.add_argument(
         "--keep-non-autosomes",
         action="store_true",
@@ -93,6 +124,72 @@ def compute_lambda_gc(pvals):
     return float(np.median(chisq) / chi2.ppf(0.5, df=1))
 
 
+def _bim_reanchor(df, args):
+    """Join sumstats to bim and overwrite args.col_snp/col_chr/col_bp
+    with bim's values. Returns the inner-joined df. Mutates args.
+    """
+    bim = pd.read_csv(
+        args.bim,
+        sep=r"\s+",
+        header=None,
+        names=["CHR_BIM", "RSID_BIM", "CM_BIM", "BP_BIM", "A1_BIM", "A2_BIM"],
+        dtype={"CHR_BIM": str},
+    )
+    bim["CHR_BIM"] = bim["CHR_BIM"].str.replace("^chr", "", regex=True)
+    print(f"[prepare_gwas] bim: {len(bim):,} variants from {args.bim}", flush=True)
+
+    if args.bim_match == "chrpos":
+        # Parse chr:pos from sumstats --col-snp. Handles 'chr:pos',
+        # 'chr:pos_A1_A2' (de Lange MarkerName) and 'chr_pos_A1_A2'
+        # (Liu variant_id). The last format uses '_' for all separators;
+        # the first two use ':' between chr and pos. Normalize both.
+        snp = df[args.col_snp].astype(str).str.replace("^chr", "", regex=True)
+        # If a ':' is present, split on it first; else fall back to '_'.
+        has_colon = snp.str.contains(":")
+        chr_tok = np.where(has_colon, snp.str.split(":").str[0],
+                           snp.str.split("_").str[0])
+        pos_rest = np.where(has_colon, snp.str.split(":").str[1],
+                            snp.str.split("_", n=1).str[1])
+        pos_tok = pd.Series(pos_rest).astype(str).str.split("_").str[0]
+        df = df.assign(_SS_CHR=pd.Series(chr_tok).values,
+                       _SS_BP=pd.to_numeric(pos_tok, errors="coerce"))
+        df = df.dropna(subset=["_SS_BP"])
+        df["_SS_BP"] = df["_SS_BP"].astype(int)
+        print(f"[prepare_gwas] bim-match=chrpos: parsed {len(df):,} chr:pos "
+              f"from {args.col_snp!r} (sample: {df.iloc[0][args.col_snp]!r})",
+              flush=True)
+        df = df.merge(
+            bim[["RSID_BIM", "CHR_BIM", "BP_BIM"]],
+            left_on=["_SS_CHR", "_SS_BP"],
+            right_on=["CHR_BIM", "BP_BIM"],
+            how="inner",
+        )
+    else:
+        # rsID join
+        print(f"[prepare_gwas] bim-match=rsid: joining sumstats {args.col_snp!r} "
+              f"to bim rsID", flush=True)
+        df = df.merge(
+            bim[["RSID_BIM", "CHR_BIM", "BP_BIM"]],
+            left_on=args.col_snp,
+            right_on="RSID_BIM",
+            how="inner",
+        )
+
+    # Overwrite SNP/CHR/BP with bim's values. Downstream code reads from
+    # args.col_snp/args.col_chr/args.col_bp — update those pointers.
+    df[args.col_snp] = df["RSID_BIM"].values
+    # Ensure chr/bp columns exist (may not have been in sumstats).
+    _ss_chr_col = "_SS_FINAL_CHR"
+    _ss_bp_col = "_SS_FINAL_BP"
+    df[_ss_chr_col] = df["CHR_BIM"].values
+    df[_ss_bp_col] = df["BP_BIM"].values
+    args.col_chr = _ss_chr_col
+    args.col_bp = _ss_bp_col
+    print(f"[prepare_gwas] after bim-join: {len(df):,} rows (anchored to bim)",
+          flush=True)
+    return df
+
+
 def main():
     args = parse_args()
     if args.col_n is None and args.n_fixed is None:
@@ -129,13 +226,24 @@ def main():
     n0 = len(df)
     print(f"[prepare_gwas] {n0:,} rows on input", flush=True)
 
-    required = [args.col_snp, args.col_chr, args.col_bp, args.col_p]
+    # Column requirement check — when --bim is set, chr/bp come from bim
+    # so sumstats need only --col-snp + --col-p.
+    if args.bim:
+        required = [args.col_snp, args.col_p]
+    else:
+        required = [args.col_snp, args.col_chr, args.col_bp, args.col_p]
     missing = [c for c in required if c not in df.columns]
     if missing:
         sys.exit(f"Missing required columns: {missing}\nAvailable: {list(df.columns)}")
 
     df = df.dropna(subset=required)
     df = df[(df[args.col_p] > 0) & (df[args.col_p] <= 1)]
+
+    # Build-safe re-anchor to the LD panel's rsID+chr+bp. Must happen
+    # before autosome filter + snp.loc output so args.col_chr/col_bp
+    # point at the bim-derived columns.
+    if args.bim:
+        df = _bim_reanchor(df, args)
 
     if args.col_frq and args.col_frq in df.columns:
         frq = df[args.col_frq].astype(float)
