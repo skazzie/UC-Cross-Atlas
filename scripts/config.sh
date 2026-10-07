@@ -11,7 +11,14 @@
 # The cloned repo on Hummingbird. Lives on scratch (not $HOME) because
 # $HOME has no space for atlas data and Hummingbird's convention is to
 # work out of /hb/scratch/$USER/. Verified 2026-10-03 (rebuild handoff).
-export UCC_REPO="${UCC_REPO:-/hb/scratch/mukhinda/UC-Cross-Atlas}"
+#
+# Use the resolved /mnt/beegfs/... path, not /hb/scratch/... — the
+# /hb/scratch symlink (→ ../scratch) only resolves on the login node;
+# compute nodes see it as dangling and `cd /hb/scratch/...` ENOENT's.
+# See job 797217 post-mortem 2026-10-07. The two paths are the same
+# physical directory; SLURM's WorkDir has always stored the resolved
+# form.
+export UCC_REPO="${UCC_REPO:-/mnt/beegfs/cluster/scratch/mukhinda/UC-Cross-Atlas}"
 
 # Big input files (atlases, references, GWAS summary stats) live under
 # scratch/ inside the repo tree — matches the "scratch/data/..." relative
@@ -60,7 +67,14 @@ export UCC_EMAIL="${UCC_EMAIL:-mukhinda@ucsc.edu}"
 export UCC_CONDA_ENV="${UCC_CONDA_ENV:-uc-cross-atlas}"
 
 # ---- Bootstrap directories on first source -------------------------------
-
+#
+# Trailing `|| true` because on compute nodes mkdir -p errors on the
+# `/hb/scratch` symlink hop ("cannot create directory '/hb/scratch':
+# File exists") with exit 1 even though -p should swallow EEXIST. With
+# `set -euo pipefail` enabled in callers (phase2, 01_magma, etc.) that
+# non-zero exit used to kill the job 1 second in — see job 795018 /
+# 795748 post-mortem 2026-10-06. The dirs exist either way; the warning
+# is cosmetic.
 mkdir -p \
     "$UCC_SCRATCH" \
     "$UCC_DATA" \
@@ -75,7 +89,8 @@ mkdir -p \
     "$UCC_RESULTS/concordance" \
     "$UCC_RESULTS/regime2" \
     "$UCC_RESULTS/figures" \
-    "$UCC_LOGS"
+    "$UCC_LOGS" \
+    2>/dev/null || true
 
 # ---- Helpers -------------------------------------------------------------
 
