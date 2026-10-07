@@ -2,7 +2,12 @@
 # Run MAGMA annotation + gene-based test.
 #
 # Locked v1 (DECISIONS.md):
-#   - 10 kb upstream + 10 kb downstream window
+#   - 10 kb upstream + 10 kb downstream window — passed as the 5th
+#     positional argument. MAGMA's --annotate default is "0,0"
+#     (intragenic only), which produces a gene-length-biased ranking
+#     (large genes capture more signal than short ones). scDRS's
+#     published settings use 10,10. The window arg here is MANDATORY;
+#     the script refuses to run with an empty value.
 #   - 1000G EUR LD reference for both UC GWAS (acknowledged approximate
 #     for multi-ancestry Liu 2023; documented in Methods)
 #   - autosomes only — enforced upstream by prepare_gwas.py (which drops
@@ -24,18 +29,6 @@
 #                  data/reference/NCBI37.3.gene.loc \
 #                  data/reference/g1000_eur \
 #                  10 results/magma/uc_delange_10kb
-#
-# Example (Liu 2023 UC):
-#   ./run_magma.sh data/gwas/uc_liu.snp.loc data/gwas/uc_liu.pval \
-#                  data/reference/NCBI37.3.gene.loc \
-#                  data/reference/g1000_eur \
-#                  10 results/magma/uc_liu_10kb
-#
-# Example (Trubetskoy schizophrenia, negative control):
-#   ./run_magma.sh data/gwas/scz.snp.loc data/gwas/scz.pval \
-#                  data/reference/NCBI37.3.gene.loc \
-#                  data/reference/g1000_eur \
-#                  10 results/magma/scz_10kb
 
 set -euo pipefail
 
@@ -51,9 +44,18 @@ BFILE="$4"
 WINDOW_KB="$5"
 OUT_PREFIX="$6"
 
+if [[ -z "$WINDOW_KB" || ! "$WINDOW_KB" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: window_kb must be a positive integer (got: '${WINDOW_KB}'). " \
+         "MAGMA default 0,0 produces gene-length-biased rankings." >&2
+    exit 1
+fi
+
 mkdir -p "$(dirname "$OUT_PREFIX")"
 
-echo "[magma] step 1: annotate (window=${WINDOW_KB},${WINDOW_KB})"
+# NOTE: window=${WINDOW_KB},${WINDOW_KB} is passed EXPLICITLY. MAGMA default
+# is 0,0 (intragenic SNPs only), which is NOT what scDRS expects. See
+# header comment and DECISIONS.md.
+echo "[magma] step 1: annotate (window=${WINDOW_KB},${WINDOW_KB} — EXPLICIT, not default)"
 magma --annotate "window=${WINDOW_KB},${WINDOW_KB}" \
       --snp-loc "$SNP_LOC" \
       --gene-loc "$GENE_LOC" \
