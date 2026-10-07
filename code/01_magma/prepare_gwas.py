@@ -124,9 +124,38 @@ def compute_lambda_gc(pvals):
     return float(np.median(chisq) / chi2.ppf(0.5, df=1))
 
 
-def _bim_reanchor(df, args):
+def _drop_ambiguous_chrpos(df, chr_col, bp_col, side_label):
+    """Drop every row whose (chr,bp) appears more than once in df.
+    This is the cheap guard rather than resolving multi-allelics: at an
+    ambiguous site we don't know which record MAGMA should use, so drop
+    all records at that site. Returns (df_filtered, n_sites_dropped).
+    """
+    key = pd.MultiIndex.from_arrays([df[chr_col].values, df[bp_col].values])
+    counts = key.value_counts()
+    amb_sites = counts[counts > 1].index
+    if len(amb_sites) == 0:
+        return df, 0
+    mask = key.isin(amb_sites)
+    n_dropped_rows = int(mask.sum())
+    df_out = df[~mask].reset_index(drop=True)
+    print(
+        f"[prepare_gwas] dedup {side_label}: dropped {len(amb_sites):,} "
+        f"ambiguous chr:pos sites ({n_dropped_rows:,} rows)",
+        flush=True,
+    )
+    return df_out, int(len(amb_sites))
+
+
+def _bim_reanchor(df, args, n_raw):
     """Join sumstats to bim and overwrite args.col_snp/col_chr/col_bp
     with bim's values. Returns the inner-joined df. Mutates args.
+
+    Ambiguous (multi-allelic) chr:pos sites are dropped on both sides
+    before the merge, per 2026-10-07 directive — simpler than resolving
+    on alleles (MAGMA gene-analysis consumes SNP/P/N only; alleles can't
+    change a gene Z) and avoids using de Lange's non-strand-resolved
+    METAL alleles. Also reports (i) overall merge rate vs raw input,
+    (ii) ambiguous-site counts; hard-fails if merge rate < 90%.
     """
     bim = pd.read_csv(
         args.bim,
@@ -137,6 +166,10 @@ def _bim_reanchor(df, args):
     )
     bim["CHR_BIM"] = bim["CHR_BIM"].str.replace("^chr", "", regex=True)
     print(f"[prepare_gwas] bim: {len(bim):,} variants from {args.bim}", flush=True)
+
+    # Dedup bim upfront — multi-allelic positions appear as multiple rows
+    # in the bim and would create multi-match ambiguity on any join.
+    bim, n_bim_amb = _drop_ambiguous_chrpos(bim, "CHR_BIM", "BP_BIM", "bim")
 
     if args.bim_match == "chrpos":
         # Parse chr:pos from sumstats --col-snp. Handles 'chr:pos',
@@ -158,6 +191,8 @@ def _bim_reanchor(df, args):
         print(f"[prepare_gwas] bim-match=chrpos: parsed {len(df):,} chr:pos "
               f"from {args.col_snp!r} (sample: {df.iloc[0][args.col_snp]!r})",
               flush=True)
+        # Dedup sumstats on parsed chr:pos
+        df, n_ss_amb = _drop_ambiguous_chrpos(df, "_SS_CHR", "_SS_BP", "sumstats")
         df = df.merge(
             bim[["RSID_BIM", "CHR_BIM", "BP_BIM"]],
             left_on=["_SS_CHR", "_SS_BP"],
@@ -165,9 +200,18 @@ def _bim_reanchor(df, args):
             how="inner",
         )
     else:
-        # rsID join
+        # rsID join. Dedup sumstats on (col-chr, col-bp) if those columns
+        # exist (Liu harmonised ships chromosome + base_pair_location);
+        # otherwise just the implicit uniqueness of the rsID key.
         print(f"[prepare_gwas] bim-match=rsid: joining sumstats {args.col_snp!r} "
               f"to bim rsID", flush=True)
+        if args.col_chr in df.columns and args.col_bp in df.columns:
+            df, n_ss_amb = _drop_ambiguous_chrpos(
+                df, args.col_chr, args.col_bp, "sumstats")
+        else:
+            n_ss_amb = 0
+            print(f"[prepare_gwas] dedup sumstats: skipped (no chr/bp cols)",
+                  flush=True)
         df = df.merge(
             bim[["RSID_BIM", "CHR_BIM", "BP_BIM"]],
             left_on=args.col_snp,
@@ -178,15 +222,24 @@ def _bim_reanchor(df, args):
     # Overwrite SNP/CHR/BP with bim's values. Downstream code reads from
     # args.col_snp/args.col_chr/args.col_bp — update those pointers.
     df[args.col_snp] = df["RSID_BIM"].values
-    # Ensure chr/bp columns exist (may not have been in sumstats).
     _ss_chr_col = "_SS_FINAL_CHR"
     _ss_bp_col = "_SS_FINAL_BP"
     df[_ss_chr_col] = df["CHR_BIM"].values
     df[_ss_bp_col] = df["BP_BIM"].values
     args.col_chr = _ss_chr_col
     args.col_bp = _ss_bp_col
-    print(f"[prepare_gwas] after bim-join: {len(df):,} rows (anchored to bim)",
-          flush=True)
+    n_after = len(df)
+    rate = 100.0 * n_after / max(n_raw, 1)
+    print(f"[prepare_gwas] after bim-join: {n_after:,} rows ({rate:.1f}% of "
+          f"{n_raw:,} raw sumstats rows); ambiguous sites dropped — "
+          f"bim: {n_bim_amb:,}, sumstats: {n_ss_amb:,}", flush=True)
+    if rate < 90.0:
+        sys.exit(
+            f"[prepare_gwas] FAIL: merge rate {rate:.1f}% below 90% gate — "
+            f"something is wrong with the sumstats <-> bim correspondence "
+            f"(wrong build, wrong rsID column, truncated bim, ...). "
+            f"Investigate before proceeding."
+        )
     return df
 
 
@@ -243,7 +296,7 @@ def main():
     # before autosome filter + snp.loc output so args.col_chr/col_bp
     # point at the bim-derived columns.
     if args.bim:
-        df = _bim_reanchor(df, args)
+        df = _bim_reanchor(df, args, n_raw=n0)
 
     if args.col_frq and args.col_frq in df.columns:
         frq = df[args.col_frq].astype(float)
