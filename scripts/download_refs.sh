@@ -7,6 +7,15 @@
 #   bash scripts/download_refs.sh
 #
 # Idempotent: existing files are skipped.
+#
+# Filenames here MUST match the INPUT paths baked into
+# scripts/slurm/01_magma.slurm. Historical drift between the two scripts
+# produced subtle MAGMA failures on 2026-10-07 (raw file vs harmonised,
+# compressed vs uncompressed); the convention now is:
+#   gwas/uc_delange_harmonised.tsv.gz   (hm_* columns, build37-consistent)
+#   gwas/uc_liu.tsv.gz
+#   gwas/height_yengo_GCST90245992.tsv  (yengo case unfinished in 01_magma)
+#   gwas/scz_trubetskoy_eur_PGC3_v3.vcf.tsv.gz  (scz case unfinished)
 
 set -euo pipefail
 
@@ -86,18 +95,31 @@ if [ -f reference/cl.owl ]; then
     echo "[download] Cell Ontology OWL downloaded $cl_date — record this in DECISIONS.md"
 fi
 
-# ---- 5. de Lange 2017 UC summary statistics (GWAS Catalog GCST004133) ----
+# ---- 5. de Lange 2017 UC (GWAS Catalog GCST004133) ----------------------
+# Fetch BOTH the raw build37 deposit and the EBI-harmonised build. The
+# raw file is build37-native with MarkerName=chr:pos_A1_A2 and no rsID;
+# 01_magma.slurm uses it as the MAGMA input and bim-joins on (chr,bp)
+# to recover rsIDs from g1000_eur.bim. The harmonised file is kept for
+# provenance / debugging only.
+#
 # NOTE 2026-06-06: this script previously listed GCST004131 here, but that
 # is the IBD-combined arm (25,042 cases). The UC-only arm is GCST004133
 # (12,366 UC cases / 33,609 controls). See DECISIONS correction (14).
-# Schema (captured 2026-06-06): MarkerName, Allele1, Allele2, Effect,
-# StdErr, P.value, Direction, HetISq, HetChiSq, HetDf, HetPVal,
-# Pval_IBDseq, Pval_IIBDGC, Pval_GWAS3, Min_single_cohort_pval. NO
-# per-SNP N — fixed N = 45,975 for all variants.
+#
+# NOTE 2026-10-07: tried the EBI harmonised build (.h.tsv.gz) alone first
+# — its hm_chrom/hm_pos are GRCh38 while NCBI37.3.gene.loc + g1000_eur
+# are GRCh37. SNPs got mis-assigned to neighbouring genes under the
+# GRCh37 gene-loc, producing PLCL1 Z=9.59 vs expected 9.81 and burying
+# IL23R / PTPN22 under noise p-values despite 457 / 204 SNPs each (see
+# 797529 post-mortem). The current build-safe route is raw + bim-anchor.
 
 _fetch \
     "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST004001-GCST005000/GCST004133/uc_build37_45975_20161107.txt.gz" \
     gwas/uc_delange_GCST004133.txt.gz
+
+_fetch \
+    "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST004001-GCST005000/GCST004133/harmonised/28067908-GCST004133-EFO_0000729.h.tsv.gz" \
+    gwas/uc_delange_harmonised.tsv.gz
 
 # ---- 5b. Liu 2023 multi-ancestry UC (GWAS Catalog GCST90446794) ----------
 # Liu 2023 Nat Genet 55:796 — UC arm of the multi-ancestry IBD analysis.
@@ -107,10 +129,28 @@ _fetch \
 # Direction, HetISq, HetChiSq, HetDf, HetPVal. NO per-SNP N — fixed N =
 # 375,508 (22,318 EAS + 353,190 EUR). Build GRCh38, 1-based.
 # File is 2.49 GB uncompressed; allow time. See DECISIONS correction (14).
+#
+# NOTE 2026-10-07: compress to .tsv.gz so the filename matches
+# 01_magma.slurm's INPUT path (uc_liu.tsv.gz). pandas handles the .gz
+# transparently, so the on-the-wire file is still the EBI .tsv.
 
+if [ ! -f gwas/uc_liu.tsv.gz ]; then
+    _fetch \
+        "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90446001-GCST90447000/GCST90446794/GCST90446794.tsv" \
+        gwas/uc_liu.tsv
+    if [ -f gwas/uc_liu.tsv ]; then
+        echo "[download] compressing uc_liu.tsv -> uc_liu.tsv.gz"
+        gzip gwas/uc_liu.tsv
+    fi
+fi
+
+# Harmonised Liu — ships a real `rsid` column (e.g. rs1274919517) which
+# the raw file lacks (variant_id there is chr_pos_A1_A2 in GRCh38 and
+# cannot be joined to g1000_eur safely by position). 01_magma.slurm uses
+# the harmonised deposit as the MAGMA input and bim-joins on rsid.
 _fetch \
-    "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90446001-GCST90447000/GCST90446794/GCST90446794.tsv" \
-    gwas/uc_liu_GCST90446794.tsv
+    "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90446001-GCST90447000/GCST90446794/harmonised/GCST90446794.h.tsv.gz" \
+    gwas/uc_liu_harmonised.tsv.gz
 
 # ---- 5c. Yengo 2022 height EUR (GWAS Catalog GCST90245992) ---------------
 # Positive-control GWAS. EUR-ancestry subset with full p-values.
@@ -118,6 +158,10 @@ _fetch \
 # effect_allele, other_allele, beta, standard_error,
 # effect_allele_frequency, p_value, variant_id, n. HAS per-SNP N column.
 # Build GRCh37. 1,597,374 European samples. ~95 MB uncompressed.
+#
+# NOTE 2026-10-07: 01_magma.slurm's yengo case is unfinished (no case
+# block exists). This file is downloaded but is not currently consumed
+# by any slurm job.
 
 _fetch \
     "https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST90245001-GCST90246000/GCST90245992/GCST90245992_buildGRCh37.tsv" \
@@ -136,6 +180,9 @@ _fetch \
 #
 # File: PGC3_SCZ_wave3.european.autosome.public.v3.vcf.tsv.gz, 240 MB,
 # md5 6ebe2376f5cda972d37efa0f214c4df0.
+#
+# NOTE 2026-10-07: 01_magma.slurm's scz case has COL_*=FIXME. This file
+# is downloaded but is not currently consumed by any slurm job.
 #
 # Format: PGC sumstats VCF v1.0 (PGC-internal extension of VCF —
 # non-standard; munge step needs to extract the 14 columns from rows
@@ -208,7 +255,7 @@ Per-SNP N column status (DECISIONS 14, 19):
 Then proceed to:
     sbatch --export=GWAS=delange scripts/slurm/01_magma.slurm
     sbatch --export=GWAS=liu     scripts/slurm/01_magma.slurm
-    sbatch --export=GWAS=yengo   scripts/slurm/01_magma.slurm
-    sbatch --export=GWAS=scz     scripts/slurm/01_magma.slurm
+    sbatch --export=GWAS=yengo   scripts/slurm/01_magma.slurm   # case unfinished
+    sbatch --export=GWAS=scz     scripts/slurm/01_magma.slurm   # case unfinished
 
 EOF
